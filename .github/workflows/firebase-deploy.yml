@@ -1,0 +1,76 @@
+name: Deploy naar Firebase
+
+# Elke push naar main zet de nieuwste versie live op https://baarden-f45cf.web.app.
+# Handmatig starten kan ook, via de knop "Run workflow" op het Actions-tabblad.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Twee deploys tegelijk zouden om dezelfde Hosting-release vechten. Lopende
+# deploys worden niet afgebroken — een halve deploy is erger dan een trage.
+concurrency:
+  group: firebase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Hosting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Zonder credential heeft deployen geen zin. Dit stopt de run netjes in
+      # plaats van hem te laten falen op een cryptische auth-fout — zie
+      # FIREBASE.md voor hoe je het secret aanmaakt.
+      - name: Controleer of het service-account secret bestaat
+        id: check
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "aanwezig=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Deploy overgeslagen"
+              echo ""
+              echo "Het secret \`FIREBASE_SERVICE_ACCOUNT\` is niet ingesteld."
+              echo "Zie **FIREBASE.md → Automatisch deployen** om het aan te maken."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "aanwezig=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v5
+        if: steps.check.outputs.aanwezig == 'true'
+        with:
+          node-version: '20'
+
+      - name: Installeer de Firebase CLI
+        if: steps.check.outputs.aanwezig == 'true'
+        run: npm install --global firebase-tools@15
+
+      - name: Schrijf de credentials weg
+        if: steps.check.outputs.aanwezig == 'true'
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$SA" > "$RUNNER_TEMP/firebase-key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-key.json" >> "$GITHUB_ENV"
+
+      # Hosting publiceert de map public/. De database rules staan niet in deze
+      # repo (ze worden in de console beheerd), dus enkel hosting gaat mee.
+      - name: Deploy
+        if: steps.check.outputs.aanwezig == 'true'
+        run: |
+          firebase deploy \
+            --only hosting \
+            --project baarden-f45cf \
+            --non-interactive \
+            --message "${GITHUB_SHA::7} — ${GITHUB_REF_NAME}"
+
+      - name: Toon de live URL
+        if: steps.check.outputs.aanwezig == 'true'
+        run: echo "Live op https://baarden-f45cf.web.app" >> "$GITHUB_STEP_SUMMARY"
