@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Baarden</title>
+<!-- Firebase SDK -->
+<script src="firebaseConfig.js"></script>
 <style>
   :root{
     --felt:#0b3d2e;
@@ -245,6 +247,10 @@
 <body>
 
 <div id="settingsControls" style="display:none;">
+  <div id="connectionStatus" style="display:flex; align-items:center; gap:8px; padding:0 12px; font-size:12px; color:#666;">
+    <span id="connectionDot" style="width:8px; height:8px; border-radius:50%; background:#4CAF50;"></span>
+    <span id="connectionText">Verbonden</span>
+  </div>
   <button class="icon-btn" onclick="toggleSettings()" aria-label="Instellingen">☰</button>
   <div id="settingsMenu" class="settings-menu" style="display:none;">
     <button class="secondary" onclick="resetRoom()">Nieuw spel in deze kamer</button>
@@ -479,6 +485,13 @@ function other(color){ return color==='red' ? 'black' : 'red'; }
 let roomCode = null, myColor = null, state = null, pollTimer = null, soloMode = false;
 let aiMode = false, aiColor = null, aiThinking = false, bypassTurnGate = false;
 let transientMsg = null;
+let firebaseUnsubscribe = null;  // Firebase listener cleanup function
+let isConnected = true;           // Connection status tracker
+let lastSuccessfulSync = Date.now(); // Track last successful Firebase sync
+// True while a local action (card animation etc.) is mid-flight. The Firebase poll
+// callback skips applying incoming state while this is true, so it can't yank the
+// `state` object out from under an in-progress action (see applyRemoteState()).
+let actionInFlight = false;
 const storageKey = () => 'baarden:'+roomCode;
 
 function createInitialState(){
@@ -513,21 +526,150 @@ function createInitialState(){
   };
 }
 
+// Firebase Realtime Database strips any key whose value is null (it treats null as
+// "delete this path"). Our state uses null for several fields (hold.red/black,
+// selected, pendingSource, towerBuild, reviveChoice, winner). When an object's ONLY
+// children are null (e.g. hold:{red:null,black:null}), Firebase drops the whole
+// parent key, so after a round-trip `state.hold` can be entirely undefined. This
+// rehydrates any state coming back from Firebase so every expected container exists,
+// without touching real data that IS present.
+function hydrateState(s){
+  if(!s || typeof s !== 'object'){
+    return createInitialState();
+  }
+  if(!s.players) s.players = {red:false, black:false};
+  if(typeof s.players.red === 'undefined') s.players.red = false;
+  if(typeof s.players.black === 'undefined') s.players.black = false;
+
+  if(!s.board) s.board = {};
+
+  if(!s.hold) s.hold = {red:null, black:null};
+  if(typeof s.hold.red === 'undefined') s.hold.red = null;
+  if(typeof s.hold.black === 'undefined') s.hold.black = null;
+
+  if(!s.blockReserve) s.blockReserve = {red:true, black:true};
+  if(typeof s.blockReserve.red === 'undefined') s.blockReserve.red = true;
+  if(typeof s.blockReserve.black === 'undefined') s.blockReserve.black = true;
+
+  if(!s.draw) s.draw = {red:[], black:[]};
+  if(!s.draw.red) s.draw.red = [];
+  if(!s.draw.black) s.draw.black = [];
+
+  if(!s.discard) s.discard = {red:[], black:[]};
+  if(!s.discard.red) s.discard.red = [];
+  if(!s.discard.black) s.discard.black = [];
+
+  if(!s.fallen) s.fallen = {red:[], black:[]};
+  if(!s.fallen.red) s.fallen.red = [];
+  if(!s.fallen.black) s.fallen.black = [];
+
+  if(!s.hand) s.hand = {red:[], black:[]};
+  if(!s.hand.red) s.hand.red = [];
+  if(!s.hand.black) s.hand.black = [];
+
+  if(!s.actedThisPhase) s.actedThisPhase = {red:false, black:false};
+  if(typeof s.actedThisPhase.red === 'undefined') s.actedThisPhase.red = false;
+  if(typeof s.actedThisPhase.black === 'undefined') s.actedThisPhase.black = false;
+
+  if(!s.towerResetThisRound) s.towerResetThisRound = {red:false, black:false};
+  if(typeof s.towerResetThisRound.red === 'undefined') s.towerResetThisRound.red = false;
+  if(typeof s.towerResetThisRound.black === 'undefined') s.towerResetThisRound.black = false;
+
+  if(typeof s.selected === 'undefined') s.selected = null;
+  if(typeof s.pendingSource === 'undefined') s.pendingSource = null;
+  if(typeof s.towerBuild === 'undefined') s.towerBuild = null;
+  if(typeof s.reviveChoice === 'undefined') s.reviveChoice = null;
+  if(typeof s.winner === 'undefined') s.winner = null;
+  if(typeof s.holdPlaceMode === 'undefined') s.holdPlaceMode = false;
+  if(typeof s.blockPlaceMode === 'undefined') s.blockPlaceMode = false;
+  if(!s.log) s.log = [];
+  if(typeof s.rev === 'undefined') s.rev = 0;
+
+  return s;
+}
+
+// Applies a freshly-polled remote state to the local `state` variable. This is the
+// single choke point that fixes a race condition: chooseHandCard() (and similar
+// selection/build/revive flows) set local-only fields like `selected` that are never
+// saved to Firebase until the action commits. Because the poll runs every ~1.5s and
+// used to blindly replace the whole `state` object, it could wipe out a player's
+// in-progress card selection — either during the idle gap between "pick a card" and
+// "click a cell" (if that took longer than a poll tick), or mid-animation inside an
+// async action (await yields control back to the event loop, letting a due poll fire).
+// Either way the next line of code would read state.selected.idx off of null/undefined
+// and throw "Cannot read properties of null (reading 'idx')".
+//
+// Fix: (1) skip applying remote updates entirely while a local action is mid-flight
+// (actionInFlight), and (2) when it's still the local player's own turn, carry the
+// local-only interaction fields forward onto the newly hydrated state, since nothing
+// else could have legitimately changed them (the opponent can't act on your turn).
+// Wrap any user-initiated action (onclick handler) that mutates `state` — sets
+// actionInFlight for its full duration (including any awaited animation) so the
+// Firebase poll callback can't replace `state` out from under it. See applyRemoteState().
+async function guardedAction(fn){
+  actionInFlight = true;
+  try{
+    await fn();
+  } finally {
+    actionInFlight = false;
+  }
+}
+
+function applyRemoteState(remoteState){
+  if(actionInFlight) return; // an in-progress action owns `state` right now — don't yank it away
+  const prev = state;
+  const next = hydrateState(remoteState);
+  if(prev && myColor && prev.turn === myColor && next.turn === myColor){
+    next.selected = prev.selected;
+    next.pendingSource = prev.pendingSource;
+    next.holdPlaceMode = prev.holdPlaceMode;
+    next.blockPlaceMode = prev.blockPlaceMode;
+    next.towerBuild = prev.towerBuild;
+    next.reviveChoice = prev.reviveChoice;
+  }
+  state = next;
+}
+
 /* ======================= STORAGE / SYNC ======================= */
 async function joinRoom(){
   const val = document.getElementById('roomInput').value.trim().toUpperCase();
   if(!val){ document.getElementById('lobbyMsg').textContent = 'Vul eerst een kamercode in.'; return; }
+
+  if(!window.firebaseDB){
+    document.getElementById('lobbyMsg').textContent = 'Firebase wordt niet geladen. Herlaad de pagina.';
+    return;
+  }
+
   roomCode = val;
+
   let existing = null;
-  try{ existing = await window.storage.get(storageKey(), true); }catch(e){ existing = null; }
+  try{
+    existing = await window.firebaseDB.loadGameState(roomCode);
+    updateConnectionStatus(true);
+  } catch(e){
+    console.error('Fehler beim Laden des Spielzustands:', e);
+    updateConnectionStatus(false);
+    document.getElementById('lobbyMsg').textContent = 'Kan spel niet laden. Controleer verbinding en probeer opnieuw.';
+    return;
+  }
+
   if(!existing){
     state = createInitialState();
     myColor = 'red';
     state.players.red = true;
     pushLog('Rood is de kamer binnengekomen.');
-    await saveState();
+    try{
+      await window.firebaseDB.createRoom(roomCode, state);
+    } catch(e){
+      console.error('Fehler beim Erstellen des Raums:', e);
+      document.getElementById('lobbyMsg').textContent = 'Kan kamer niet aanmaken. Probeer opnieuw.';
+      return;
+    }
   } else {
-    state = JSON.parse(existing.value);
+    // Defensive: ensure state has required structure (Firebase strips null-only
+    // sub-objects on write, e.g. hold:{red:null,black:null} can vanish entirely)
+    state = hydrateState(existing);
+
     if(!state.players.red){ myColor='red'; state.players.red=true; pushLog('Rood is de kamer binnengekomen.'); await saveState(); }
     else if(!state.players.black){ myColor='black'; state.players.black=true; pushLog('Zwart is de kamer binnengekomen.'); await saveState(); }
     else { myColor = null; }
@@ -591,25 +733,72 @@ function startVsAI(humanColor){
 }
 
 async function saveState(){
-  state.rev = (state.rev||0)+1;
-  if(!soloMode && !aiMode){
-    try{ await window.storage.set(storageKey(), JSON.stringify(state), true); }
-    catch(e){ console.error('Opslaan mislukt', e); }
+  if(!soloMode && !aiMode && window.firebaseDB){
+    try{
+      await window.firebaseDB.saveGameState(roomCode, state);
+      lastSuccessfulSync = Date.now();
+      if(!isConnected){ updateConnectionStatus(true); }
+    }
+    catch(e){
+      console.error('Opslaan mislukt:', e);
+      updateConnectionStatus(false);
+      // Log error but don't block gameplay - Firebase will sync when connection restored
+      console.warn('Spel niet opgeslagen in Firebase (check verbinding)');
+    }
   }
   renderAll();
 }
 
+function updateConnectionStatus(connected){
+  isConnected = connected;
+  const dot = document.getElementById('connectionDot');
+  const text = document.getElementById('connectionText');
+  if(!dot || !text) return;
+
+  if(connected){
+    dot.style.background = '#4CAF50';
+    text.textContent = 'Verbonden';
+    text.style.color = '#666';
+  } else {
+    dot.style.background = '#FF9800';
+    text.textContent = 'Offline (wacht op verbinding)';
+    text.style.color = '#FF9800';
+  }
+}
+
 function startPolling(){
-  if(pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(async ()=>{
+  // Stop any existing listener
+  if(firebaseUnsubscribe){
+    firebaseUnsubscribe();
+    firebaseUnsubscribe = null;
+  }
+
+  // Set up Firebase real-time listener
+  if(window.firebaseDB){
     try{
-      const res = await window.storage.get(storageKey(), true);
-      if(res){
-        const remote = JSON.parse(res.value);
-        if(!state || remote.rev !== state.rev){ state = remote; renderAll(); }
-      }
-    }catch(e){ /* negeren */ }
-  }, 1500);
+      firebaseUnsubscribe = window.firebaseDB.onStateChange(roomCode, (remoteState)=>{
+        try{
+          if(remoteState){
+            lastSuccessfulSync = Date.now();
+            if(!isConnected){ updateConnectionStatus(true); }
+            if(!actionInFlight){
+              applyRemoteState(remoteState);
+              renderAll();
+            }
+          }
+        } catch(e){
+          console.error('Fehler beim Verarbeiten von Zustandsänderung:', e);
+        }
+      });
+      // Set initial connected status
+      updateConnectionStatus(true);
+    } catch(e){
+      console.error('Fehler beim Starten des Firebase-Listeners:', e);
+      updateConnectionStatus(false);
+    }
+  } else {
+    console.warn('Firebase niet geladen - polling uitgeschakeld');
+  }
 }
 
 function toggleSettings(){
@@ -678,6 +867,12 @@ function closeRules(){
 function backToMenu(){
   document.getElementById('settingsMenu').style.display = 'none';
   document.getElementById('settingsControls').style.display = 'none';
+  // Clean up Firebase listener
+  if(firebaseUnsubscribe){
+    firebaseUnsubscribe();
+    firebaseUnsubscribe = null;
+  }
+  // Clean up old polling timer if it exists
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
   roomCode = null;
   myColor = null;
@@ -1794,15 +1989,27 @@ function renderBoard(){
       }
 
       if(isSelectable(cellId)) div.classList.add('selectable');
-      div.onclick = () => onCellClick(cellId);
+      div.onclick = () => guardedAction(() => onCellClick(cellId));
       el.appendChild(div);
     });
   });
 }
 
 function renderFallenBadges(){
+  // Defensive: ensure state and state.fallen exist
+  if (!state || !state.fallen) {
+    state = state || {};
+    state.fallen = state.fallen || { red: [], black: [] };
+  }
+
   const mk = (color) => {
     const wrap = document.createElement('div');
+
+    // Defensive: ensure color exists in fallen
+    if (!state.fallen[color]) {
+      state.fallen[color] = [];
+    }
+
     const fallenCount = state.fallen[color].length;
     const fBadge = document.createElement('div');
     fBadge.className = 'fallen-badge';
@@ -1877,7 +2084,7 @@ function renderReserveAndHold(){
       && ownFreeTerritoryCells(color).length>0;
     if(canFill){
       h.classList.add('selectable');
-      h.onclick = () => placeInHold();
+      h.onclick = () => guardedAction(() => placeInHold());
     } else if(canTakeOut){
       h.classList.add('selectable');
       h.onclick = () => { state.holdPlaceMode = true; renderAll(); };
@@ -1928,7 +2135,7 @@ function renderDrawArea(){
   if(isMyTurn() && state.phase==='draw'){
     const btn = document.createElement('button');
     btn.textContent = 'Trek kaarten (beide spelers)';
-    btn.onclick = doDrawBoth;
+    btn.onclick = () => guardedAction(() => doDrawBoth());
     el.appendChild(btn);
   }
 }
@@ -1974,7 +2181,7 @@ function renderPlaceActions(){
     const b = document.createElement('button');
     b.className = 'build';
     b.textContent = `Toren opwaarderen`;
-    b.onclick = () => startTowerBuild('place');
+    b.onclick = () => guardedAction(() => startTowerBuild('place'));
     el.appendChild(b);
   }
 
@@ -1987,7 +2194,7 @@ function renderPlaceActions(){
   const passBtn = document.createElement('button');
   passBtn.textContent = 'Pas';
   passBtn.className = 'secondary';
-  passBtn.onclick = passPlace;
+  passBtn.onclick = () => guardedAction(() => passPlace());
   el.appendChild(passBtn);
 }
 
@@ -2040,7 +2247,7 @@ function renderMoveActions(){
     const b = document.createElement('button');
     b.className = 'build';
     b.textContent = `Toren opwaarderen`;
-    b.onclick = () => startTowerBuild('move');
+    b.onclick = () => guardedAction(() => startTowerBuild('move'));
     el.appendChild(b);
   }
 
@@ -2061,7 +2268,7 @@ function renderMoveActions(){
     const b = document.createElement('button');
     b.className = 'secondary';
     b.textContent = 'Geen zet mogelijk — beurt doorgeven';
-    b.onclick = noValidMoveContinue;
+    b.onclick = () => guardedAction(() => noValidMoveContinue());
     el.appendChild(b);
   }
 }
@@ -2102,7 +2309,7 @@ function renderTowerBuildChoice(){
     d.style.position = 'relative';
     d.style.cursor = 'pointer';
     d.innerHTML = `${item.card.rank}<br>${suitSymbol(item.card.suit)}`;
-    d.onclick = () => chooseTowerCandidate(idx);
+    d.onclick = () => guardedAction(() => chooseTowerCandidate(idx));
     const src = document.createElement('div');
     src.style.fontSize = '10px';
     src.style.opacity = '.75';
@@ -2136,14 +2343,14 @@ function renderReviveChoice(){
     d.style.position = 'relative';
     d.style.cursor = 'pointer';
     d.innerHTML = `${card.rank}<br>${suitSymbol(card.suit)}`;
-    d.onclick = () => chooseRevive(card.id);
+    d.onclick = () => guardedAction(() => chooseRevive(card.id));
     row.appendChild(d);
   });
   el.appendChild(row);
   const noneBtn = document.createElement('button');
   noneBtn.className = 'secondary';
   noneBtn.textContent = 'Geen enkele herleven';
-  noneBtn.onclick = () => chooseRevive(null);
+  noneBtn.onclick = () => guardedAction(() => chooseRevive(null));
   el.appendChild(noneBtn);
 }
 

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Firebase REST API Test</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #fff; }
+    .log { background: #2d2d2d; padding: 10px; margin: 5px 0; border-left: 3px solid #4CAF50; }
+    .error { border-left-color: #f44336; }
+    pre { background: #000; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Firebase REST API Debug</h1>
+  <button onclick="testFirebase()">Test Firebase Connection</button>
+  <button onclick="loadRoom('Z9MQ')">Load Room Z9MQ</button>
+  <div id="output"></div>
+
+  <script>
+    const DB_URL = "https://baarden-f45cf-default-rtdb.europe-west1.firebasedatabase.app";
+
+    function log(msg, isError = false) {
+      const div = document.createElement('div');
+      div.className = 'log ' + (isError ? 'error' : '');
+      div.innerHTML = msg;
+      document.getElementById('output').appendChild(div);
+      console.log(msg);
+    }
+
+    async function testFirebase() {
+      log('Testing Firebase connection...');
+      try {
+        const response = await fetch(`${DB_URL}/.json`);
+        log(`✓ Firebase responded with status: ${response.status}`);
+        const data = await response.json();
+        log(`<pre>Root data:\n${JSON.stringify(data, null, 2)}</pre>`);
+      } catch (e) {
+        log(`✗ Error: ${e.message}`, true);
+      }
+    }
+
+    async function loadRoom(roomCode) {
+      log(`Loading room ${roomCode}...`);
+      try {
+        // Load full room structure
+        const urlFull = `${DB_URL}/rooms/${roomCode}.json`;
+        const responseFull = await fetch(urlFull);
+        log(`Full room response: ${responseFull.status}`);
+        const dataFull = await responseFull.json();
+        log(`<pre>Full room structure:\n${JSON.stringify(dataFull, null, 2)}</pre>`);
+
+        // Load just gameState
+        const urlState = `${DB_URL}/rooms/${roomCode}/gameState.json`;
+        const responseState = await fetch(urlState);
+        log(`GameState response: ${responseState.status}`);
+        const dataState = await responseState.json();
+        log(`<pre>GameState only:\n${JSON.stringify(dataState, null, 2).substring(0, 500)}...</pre>`);
+      } catch (e) {
+        log(`✗ Error: ${e.message}`, true);
+      }
+    }
+  </script>
+</body>
+</html>
