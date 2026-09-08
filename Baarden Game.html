@@ -715,16 +715,20 @@ function kiesSkin(id){
 // kleuren dan nog bezet, dan kom je binnen als toeschouwer — net als voorheen.
 let clientIdInGeheugen = null;
 function myClientId(){
-  if(clientIdInGeheugen) return clientIdInGeheugen;
-  let id = null;
-  try { id = sessionStorage.getItem('baarden:clientId'); } catch(e){}
+  let id = clientIdInGeheugen;
+  if(!id){
+    try { id = sessionStorage.getItem('baarden:clientId'); } catch(e){}
+  }
   if(!id){
     id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,10);
-    try { sessionStorage.setItem('baarden:clientId', id); } catch(e){}
   }
-  // Ook onthouden in het geheugen: werkt de opslag niet, dan gaf elke aanroep anders een nieuw id
-  // en zou je jezelf binnen dezelfde sessie niet meer herkennen.
+  // Het id staat zowel in het geheugen als in de opslag, en we schrijven het elke keer opnieuw weg.
+  // Het geheugen zorgt dat een geblokkeerde opslag niet bij elke aanroep een nieuw id oplevert; het
+  // terugschrijven zorgt dat de opslag nooit achterblijft bij het geheugen. Raakten die twee uit
+  // elkaar, dan claimde je je kleur met een id dat een herlaadbeurt niet overleefde en kwam je
+  // daarna als toeschouwer terug.
   clientIdInGeheugen = id;
+  try { sessionStorage.setItem('baarden:clientId', id); } catch(e){}
   return id;
 }
 
