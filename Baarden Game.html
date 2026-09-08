@@ -647,7 +647,19 @@ async function guardedAction(fn){
     await fn();
   } finally {
     actionInFlight = false;
+    flushPendingRemoteState();
   }
+}
+
+// Een update die binnenkwam terwijl deze speler zelf een zet deed, werd vroeger gewoon genegeerd.
+// De zet van de tegenstander — en dus ook de animatie ervan — verscheen daardoor pas bij de
+// volgende wijziging, of helemaal niet. Nu bewaren we hem en spelen we hem alsnog af zodra het kan.
+function flushPendingRemoteState(){
+  if(actionInFlight || remoteAnimating) return;
+  const queued = pendingRemoteState;
+  if(!queued) return;
+  pendingRemoteState = null;
+  handleRemoteState(queued);
 }
 
 /* ======================= ANIMATIES VAN DE TEGENSTANDER =======================
@@ -692,13 +704,19 @@ function offBoardAnchor(color){
   if(!boardEl) return null;
   const r = boardEl.getBoundingClientRect();
   if(!r.width) return null;
+  // Aan welke kant van het scherm ligt deze kleur nu? Uit de DOM gelezen i.p.v. uit de kleur,
+  // zodat dit vanzelf blijft kloppen met een gedraaid bord (zie boardIsFlipped()).
+  const towerEl = document.querySelector(`.cell[data-cell="${towerCellOf(color)}"]`);
+  const atTop = towerEl
+    ? towerEl.getBoundingClientRect().top < r.top + r.height/2
+    : color === 'red';
   const size = (r.width/3) * 0.78;
   const a = document.createElement('div');
   a.style.position = 'fixed';
   a.style.width = size+'px';
   a.style.height = size+'px';
   a.style.left = (r.left + r.width/2 - size/2)+'px';
-  a.style.top = (color==='red' ? r.top - size - 12 : r.bottom + 12)+'px';
+  a.style.top = (atTop ? r.top - size - 12 : r.bottom + 12)+'px';
   a.style.opacity = '0';
   a.style.pointerEvents = 'none';
   document.body.appendChild(a);
@@ -727,7 +745,8 @@ function collectRemoteAnimations(prev, next){
     if(!piece || piece.owner !== opp) return;
     if(from){
       out.push(async ()=>{
-        const srcEl = document.querySelector(`.cell[data-cell="${from}"] .card-face:not(.peek-dim)`);
+        const fromCellEl = document.querySelector(`.cell[data-cell="${from}"]`);
+        const srcEl = (fromCellEl && fromCellEl.querySelector('.card-face:not(.peek-dim)')) || fromCellEl;
         const dstEl = document.querySelector(`.cell[data-cell="${to}"]`);
         await animateCardSlide(srcEl, dstEl, piece);
       });
@@ -772,8 +791,7 @@ let pendingRemoteState = null;
 // afspelen op de oude stand, dan pas de nieuwe state toepassen en hertekenen. Komt er ondertussen
 // alweer een update binnen, dan onthouden we enkel de laatste en verwerken die daarna.
 async function handleRemoteState(remoteState){
-  if(actionInFlight) return;
-  if(remoteAnimating){ pendingRemoteState = remoteState; return; }
+  if(actionInFlight || remoteAnimating){ pendingRemoteState = remoteState; return; }
   remoteAnimating = true;
   try{
     let incoming = remoteState;
@@ -797,7 +815,9 @@ async function handleRemoteState(remoteState){
     }
   } finally {
     remoteAnimating = false;
-    pendingRemoteState = null;
+    // Brak de lus af omdat deze speler zelf begon te spelen? Dan blijft de laatste update in de
+    // wachtrij staan; guardedAction() verwerkt hem zodra die actie klaar is.
+    flushPendingRemoteState();
   }
 }
 
@@ -1150,6 +1170,11 @@ function computeTowerChain(color, scope){
 // Generieke vlieg-animatie: een kloon van `card` vliegt van sourceEl naar destEl. Gebruikt door
 // alle verplaats-interacties (veld leggen, hold in/uit, toren opwaarderen, gewone zet).
 function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
+// Leest een layout-eigenschap zodat de browser de huidige stijl synchroon moet doorrekenen. Dit
+// is wat garandeert dat een CSS-transition daarna echt afspeelt i.p.v. weggeoptimaliseerd te
+// worden; een simpele setTimeout of rAF geeft die garantie niet op elk toestel.
+function forceReflow(el){ if(el) void el.offsetWidth; }
+
 function nextFrame(){
   return new Promise(res=>{
     let done = false;
@@ -1180,6 +1205,7 @@ async function animateCardFly(sourceEl, destEl, card){
   document.body.appendChild(clone);
   const dx = (dstRect.left + dstRect.width/2) - (srcRect.left + srcRect.width/2);
   const dy = (dstRect.top + dstRect.height/2) - (srcRect.top + srcRect.height/2);
+  forceReflow(clone);
   await nextFrame();
   clone.style.transform = `translate(${dx}px, ${dy}px) scale(0.85)`;
   clone.style.opacity = '0.35';
@@ -1208,6 +1234,7 @@ async function animateCardSlide(sourceEl, destEl, card){
   document.body.appendChild(clone);
   const dx = (dstRect.left + dstRect.width/2) - (srcRect.left + srcRect.width/2);
   const dy = (dstRect.top + dstRect.height/2) - (srcRect.top + srcRect.height/2);
+  forceReflow(clone);
   await nextFrame();
   clone.style.transform = `translate(${dx}px, ${dy}px)`;
   await sleep(270);
@@ -1264,6 +1291,7 @@ async function animateBlockCard(color, fromCell, toCell){
   document.body.appendChild(clone);
   const dx = (dstRect.left + dstRect.width/2) - (srcRect.left + srcRect.width/2);
   const dy = (dstRect.top + dstRect.height/2) - (srcRect.top + srcRect.height/2);
+  forceReflow(clone);
   await nextFrame();
   clone.style.transform = `translate(${dx}px, ${dy}px)`;
   await sleep(390);
@@ -2161,12 +2189,25 @@ function appendStackVisual(div, stack, isTower){
   div.appendChild(top);
 }
 
+// In een kamer hoort elke speler zichzelf onderaan zijn eigen scherm te zien. In de
+// standaardvolgorde (rij a bovenaan) ligt Zwart al onderaan, dus enkel bij Rood draaien we het
+// bord 180° — rijen én kolommen omgekeerd, net als een fysiek bord dat je naar je toe draait.
+// Solo telt niet mee: daar bestuurt één persoon beide kleuren, dus is er geen "eigen" kant.
+// Een toeschouwer (myColor null) krijgt de standaardstand.
+function boardIsFlipped(){
+  return !soloMode && myColor === 'red';
+}
+
 function renderBoard(){
   const el = document.getElementById('board');
   el.innerHTML = '';
 
-  ROWS.forEach(r => {
-    COLS.forEach(c => {
+  const flip = boardIsFlipped();
+  const rows = flip ? ROWS.slice().reverse() : ROWS;
+  const cols = flip ? COLS.slice().reverse() : COLS;
+
+  rows.forEach(r => {
+    cols.forEach(c => {
       const cellId = r+c;
       const div = document.createElement('div');
       div.className = 'cell';
