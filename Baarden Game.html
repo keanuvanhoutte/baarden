@@ -61,8 +61,17 @@
     background:rgba(0,0,0,.25); border:1px solid var(--line); border-radius:10px;
     padding:14px; margin:0 0 8px 0;
   }
-  #soloPanel, .btn-row{ display:flex; flex-direction:row; gap:10px; }
-  #soloPanel button, .btn-row button{ flex:1; margin:0; text-align:center; padding:12px 6px; font-size:13px; }
+  .btn-row{ display:flex; flex-direction:row; gap:10px; }
+  .btn-row button{ flex:1; margin:0; text-align:center; padding:12px 6px; font-size:13px; }
+  .subpanel-title{
+    text-align:center; color:var(--gold); font-family:'Trebuchet MS', Helvetica, sans-serif;
+    font-size:14px; letter-spacing:1.5px; text-transform:uppercase; font-weight:bold;
+    margin:0 0 10px 0; padding-bottom:8px; border-bottom:1px solid var(--line);
+  }
+  .subpanel-back{ display:block; width:100%; margin:12px 0 0 0; text-align:center; }
+  /* Hoofdactie van het multiplayer-paneel op volle breedte: hij stond op halve breedte naast een
+     volle-breedte "Terug"-knop, wat er onafgewerkt uitzag. */
+  .subpanel-primary{ display:block; width:100%; margin:8px 0 0 0; text-align:center; }
   .panel{
     max-width:520px; width:100%; margin:0 auto 10px auto;
     background:rgba(0,0,0,.25);
@@ -112,7 +121,7 @@
   .board-row{ display:flex; align-items:center; justify-content:center; gap:8px; margin:4px 0; }
   .fallen-col{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; flex-shrink:0; width:44px; }
   .board{
-    width:100%; max-width:min(190px, 62vw); margin:0; display:grid;
+    width:100%; max-width:min(168px, 56vw); margin:0; display:grid;
     grid-template-columns:repeat(3,1fr);
     gap:4px;
     flex-shrink:0;
@@ -206,6 +215,20 @@
     button{ font-size:13px; padding:9px 11px; }
   }
 
+  /* Verbindingsstatus: staat onderaan het spelpaneel (niet meer bovenaan) en volgt de kleuren
+     van het spel zelf, i.p.v. de neutrale grijs/oranje "dark mode"-tinten van daarvoor. */
+  .conn-status{
+    display:none; align-items:center; justify-content:center; gap:7px;
+    font-size:11px; color:var(--cream); opacity:.6;
+    margin:12px 0 0 0; padding-top:8px; border-top:1px solid var(--line);
+  }
+  .conn-status .conn-dot{
+    width:8px; height:8px; border-radius:50%;
+    background:#4f9c74; border:1px solid var(--gold);
+  }
+  .conn-status.offline{ color:var(--gold); opacity:.95; }
+  .conn-status.offline .conn-dot{ background:var(--red); }
+
   .fallen-badge{
     font-size:11px; padding:4px 8px; border-radius:6px; cursor:pointer;
     background:rgba(0,0,0,.3); border:1px solid var(--line);
@@ -247,10 +270,6 @@
 <body>
 
 <div id="settingsControls" style="display:none;">
-  <div id="connectionStatus" style="display:flex; align-items:center; gap:8px; padding:0 12px; font-size:12px; color:#666;">
-    <span id="connectionDot" style="width:8px; height:8px; border-radius:50%; background:#4CAF50;"></span>
-    <span id="connectionText">Verbonden</span>
-  </div>
   <button class="icon-btn" onclick="toggleSettings()" aria-label="Instellingen">☰</button>
   <div id="settingsMenu" class="settings-menu" style="display:none;">
     <button class="secondary" onclick="resetRoom()">Nieuw spel in deze kamer</button>
@@ -344,31 +363,43 @@
     <div class="menu-suits"><span class="red">♥ ♦</span><span class="black">♠ ♣</span></div>
   </div>
 
-  <button class="menu-btn" onclick="toggleMultiplayerPanel()">🌐 Multiplayer</button>
+  <div id="menuButtons">
+    <button class="menu-btn" onclick="openMenuPanel('multiplayer')">🌐 Multiplayer</button>
+    <button class="menu-btn" onclick="openMenuPanel('solo')">Solo spelen</button>
+    <button class="menu-btn" onclick="openRules()">📖 Spelregels</button>
+  </div>
+
   <div id="multiplayerPanel" class="menu-subpanel" style="display:none;">
+    <div class="subpanel-title">🌐 Multiplayer</div>
     <div class="status-line">Kamercode (deel dit met het andere device):</div>
     <input type="text" id="roomInput" maxlength="6" placeholder="bv. ABC1">
     <button class="secondary" onclick="generateRoomCode()">🎲 Genereer code</button>
-    <button onclick="joinRoom()">Kamer starten / joinen</button>
+    <button class="subpanel-primary" onclick="joinRoom()">Kamer starten / joinen</button>
     <div class="transient" id="lobbyMsg"></div>
     <div class="status-line" style="opacity:.7; font-size:12px;">
       Beide devices vullen dezelfde code in. Wie als eerste komt speelt Rood, de tweede Zwart.
     </div>
+    <button class="secondary subpanel-back" onclick="openMenuPanel(null)">← Terug</button>
   </div>
 
-  <button class="menu-btn" onclick="toggleSoloPanel()">Solo spelen</button>
   <div id="soloPanel" class="menu-subpanel" style="display:none;">
-    <button onclick="startSolo()">Solo Game</button>
-    <button onclick="toggleAiColorPanel()">🤖 Tegen AI</button>
+    <div class="subpanel-title">Solo spelen</div>
+    <div class="btn-row">
+      <button onclick="startSolo()">Solo Game</button>
+      <button onclick="openMenuPanel('ai')">🤖 Tegen AI</button>
+    </div>
+    <button class="secondary subpanel-back" onclick="openMenuPanel(null)">← Terug</button>
   </div>
+
   <div id="aiColorPanel" class="menu-subpanel" style="display:none;">
+    <div class="subpanel-title">🤖 Tegen AI</div>
     <div class="status-line" style="text-align:center; margin-top:0;">Kies je kleur:</div>
     <div class="btn-row">
       <button onclick="startVsAI('red')">🔴 Rood</button>
       <button onclick="startVsAI('black')">⚫ Zwart</button>
     </div>
+    <button class="secondary subpanel-back" onclick="openMenuPanel('solo')">← Terug</button>
   </div>
-  <button class="menu-btn" onclick="openRules()">📖 Spelregels</button>
 </div>
 </div>
 
@@ -391,6 +422,10 @@
   <div id="placeActions" class="actions"></div>
   <div id="moveActions" class="actions"></div>
   <div id="hint" class="status-line" style="text-align:center;"></div>
+  <div id="connectionStatus" class="conn-status">
+    <span id="connectionDot" class="conn-dot"></span>
+    <span id="connectionText">Verbonden</span>
+  </div>
 </div>
 
 
@@ -615,6 +650,157 @@ async function guardedAction(fn){
   }
 }
 
+/* ======================= ANIMATIES VAN DE TEGENSTANDER =======================
+   Elke animatie draaide tot nu toe enkel op het scherm van de speler die de zet deed; de andere
+   speler kreeg via Firebase alleen de eindstand binnen en zag het bord dus zomaar "springen".
+   Hieronder vergelijken we de binnenkomende stand met de stand die nog op het scherm staat, en
+   spelen we de bijhorende animatie af VOOR we de nieuwe state toepassen — op dat moment toont de
+   DOM nog de oude stand, dus alle bron-elementen bestaan nog. */
+
+// Waar ligt elke kaart (op eender welke laag) op dit bord? kaart-id -> vakje.
+function boardCardCells(board){
+  const map = {};
+  if(!board) return map;
+  Object.keys(board).forEach(cell=>{
+    const stack = board[cell];
+    if(!Array.isArray(stack)) return;
+    stack.forEach(piece=>{ if(piece && piece.id) map[piece.id] = cell; });
+  });
+  return map;
+}
+
+// Blok-kaarten hebben geen id, dus die zoeken we apart op kleur op.
+function blockCellOf(board, color){
+  if(!board) return null;
+  for(const cell of Object.keys(board)){
+    const stack = board[cell];
+    if(Array.isArray(stack) && stack.some(pc => pc && pc.kind==='block' && pc.owner===color)) return cell;
+  }
+  return null;
+}
+
+function pieceInStack(stack, id){
+  if(!Array.isArray(stack)) return null;
+  for(let i=stack.length-1; i>=0; i--){ if(stack[i] && stack[i].id===id) return stack[i]; }
+  return null;
+}
+
+// Een kaart die de tegenstander uit zijn hand speelt heeft voor ons geen zichtbare bron (we zien
+// zijn hand niet). Daarom vliegt hij binnen van net buiten het bord, aan zijn eigen kant ervan.
+function offBoardAnchor(color){
+  const boardEl = document.getElementById('board');
+  if(!boardEl) return null;
+  const r = boardEl.getBoundingClientRect();
+  if(!r.width) return null;
+  const size = (r.width/3) * 0.78;
+  const a = document.createElement('div');
+  a.style.position = 'fixed';
+  a.style.width = size+'px';
+  a.style.height = size+'px';
+  a.style.left = (r.left + r.width/2 - size/2)+'px';
+  a.style.top = (color==='red' ? r.top - size - 12 : r.bottom + 12)+'px';
+  a.style.opacity = '0';
+  a.style.pointerEvents = 'none';
+  document.body.appendChild(a);
+  return a;
+}
+
+async function flyFromOffBoard(color, destEl, card){
+  const anchor = offBoardAnchor(color);
+  try{ await animateCardFly(anchor, destEl, card); }
+  finally{ if(anchor) anchor.remove(); }
+}
+
+// Bouwt de lijst animaties (als thunks) voor alles wat de tegenstander veranderd heeft.
+function collectRemoteAnimations(prev, next){
+  const out = [];
+  if(!prev || !next || soloMode || aiMode || !myColor) return out;
+  if(document.hidden) return out; // niemand kijkt: meteen naar de eindstand
+  const opp = other(myColor);
+  const before = boardCardCells(prev.board);
+  const after  = boardCardCells(next.board);
+
+  Object.keys(after).forEach(id=>{
+    const to = after[id], from = before[id];
+    if(from === to) return;
+    const piece = pieceInStack(next.board[to], id);
+    if(!piece || piece.owner !== opp) return;
+    if(from){
+      out.push(async ()=>{
+        const srcEl = document.querySelector(`.cell[data-cell="${from}"] .card-face:not(.peek-dim)`);
+        const dstEl = document.querySelector(`.cell[data-cell="${to}"]`);
+        await animateCardSlide(srcEl, dstEl, piece);
+      });
+    } else {
+      // Nieuw op het bord: ofwel uit de hold van de tegenstander, ofwel uit zijn hand.
+      const fromHold = !!(prev.hold && prev.hold[opp] && prev.hold[opp].id === id);
+      out.push(async ()=>{
+        const dstEl = document.querySelector(`.cell[data-cell="${to}"]`);
+        if(fromHold){
+          await animateCardFly(document.querySelector(`[data-hold-color="${opp}"]`), dstEl, piece);
+        } else {
+          await flyFromOffBoard(opp, dstEl, piece);
+        }
+      });
+    }
+  });
+
+  // Kaart die bij de tegenstander in de hold belandt (vrijwillig gelegd of herleefd).
+  const oppHoldBefore = prev.hold ? prev.hold[opp] : null;
+  const oppHoldAfter  = next.hold ? next.hold[opp] : null;
+  if(oppHoldAfter && (!oppHoldBefore || oppHoldBefore.id !== oppHoldAfter.id) && !before[oppHoldAfter.id]){
+    out.push(async ()=>{
+      const dstEl = document.querySelector(`[data-hold-color="${opp}"]`);
+      await flyFromOffBoard(opp, dstEl, oppHoldAfter);
+    });
+  }
+
+  // Blok-kaart van de tegenstander die geplaatst of verlegd wordt.
+  const blockFrom = blockCellOf(prev.board, opp);
+  const blockTo   = blockCellOf(next.board, opp);
+  if(blockTo && blockTo !== blockFrom){
+    out.push(async ()=> { await animateBlockCard(opp, blockFrom, blockTo); });
+  }
+
+  return out;
+}
+
+let remoteAnimating = false;
+let pendingRemoteState = null;
+
+// Enige ingang voor binnenkomende Firebase-updates: eerst de animaties van de tegenstander
+// afspelen op de oude stand, dan pas de nieuwe state toepassen en hertekenen. Komt er ondertussen
+// alweer een update binnen, dan onthouden we enkel de laatste en verwerken die daarna.
+async function handleRemoteState(remoteState){
+  if(actionInFlight) return;
+  if(remoteAnimating){ pendingRemoteState = remoteState; return; }
+  remoteAnimating = true;
+  try{
+    let incoming = remoteState;
+    while(incoming){
+      const next = hydrateState(incoming);
+      // Een mislukte animatie mag nooit de nieuwe stand tegenhouden — het bord bijwerken is
+      // belangrijker dan het vlieg-effect.
+      let anims = [];
+      try{ anims = collectRemoteAnimations(state, next); }
+      catch(e){ console.error('Animaties van tegenstander konden niet bepaald worden:', e); }
+      for(const play of anims){
+        if(actionInFlight) break;
+        try{ await play(); }
+        catch(e){ console.error('Animatie van tegenstander mislukt:', e); }
+      }
+      if(actionInFlight) break;
+      applyRemoteState(incoming);
+      renderAll();
+      incoming = pendingRemoteState;
+      pendingRemoteState = null;
+    }
+  } finally {
+    remoteAnimating = false;
+    pendingRemoteState = null;
+  }
+}
+
 function applyRemoteState(remoteState){
   if(actionInFlight) return; // an in-progress action owns `state` right now — don't yank it away
   const prev = state;
@@ -677,23 +863,24 @@ async function joinRoom(){
   document.getElementById('lobbyWrap').style.display='none';
   document.getElementById('gamePanel').style.display='block';
   document.getElementById('settingsControls').style.display='block';
+  showConnectionStatus(true);
   startPolling();
   renderAll();
 }
 
-function toggleMultiplayerPanel(){
-  const el = document.getElementById('multiplayerPanel');
-  el.style.display = (el.style.display==='none' || !el.style.display) ? 'block' : 'none';
-}
+// Het menu toont maar één niveau tegelijk: een subpaneel VERVANGT de hoofdknoppen i.p.v. eronder
+// te verschijnen terwijl de aangeklikte knop bleef staan (dat las verwarrend). `null` = terug naar
+// de hoofdknoppen. Elk subpaneel heeft daarvoor zelf een "← Terug"-knop.
+const MENU_PANELS = { multiplayer:'multiplayerPanel', solo:'soloPanel', ai:'aiColorPanel' };
 
-function toggleSoloPanel(){
-  const el = document.getElementById('soloPanel');
-  el.style.display = (el.style.display==='none' || !el.style.display) ? 'flex' : 'none';
-}
-
-function toggleAiColorPanel(){
-  const el = document.getElementById('aiColorPanel');
-  el.style.display = (el.style.display==='none' || !el.style.display) ? 'block' : 'none';
+function openMenuPanel(name){
+  Object.values(MENU_PANELS).forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.style.display = 'none';
+  });
+  document.getElementById('menuButtons').style.display = name ? 'none' : 'block';
+  if(name && MENU_PANELS[name]) document.getElementById(MENU_PANELS[name]).style.display = 'block';
+  if(name !== 'multiplayer') document.getElementById('lobbyMsg').textContent = '';
 }
 
 function generateRoomCode(){
@@ -706,6 +893,7 @@ function generateRoomCode(){
 
 function startSolo(){
   soloMode = true;
+  showConnectionStatus(false);
   roomCode = null;
   myColor = null;
   state = createInitialState();
@@ -719,6 +907,7 @@ function startSolo(){
 
 function startVsAI(humanColor){
   aiMode = true;
+  showConnectionStatus(false);
   soloMode = false;
   myColor = humanColor;
   aiColor = other(humanColor);
@@ -751,19 +940,18 @@ async function saveState(){
 
 function updateConnectionStatus(connected){
   isConnected = connected;
-  const dot = document.getElementById('connectionDot');
+  const bar = document.getElementById('connectionStatus');
   const text = document.getElementById('connectionText');
-  if(!dot || !text) return;
+  if(!bar || !text) return;
+  bar.classList.toggle('offline', !connected);
+  text.textContent = connected ? 'Verbonden' : 'Offline — wacht op verbinding';
+}
 
-  if(connected){
-    dot.style.background = '#4CAF50';
-    text.textContent = 'Verbonden';
-    text.style.color = '#666';
-  } else {
-    dot.style.background = '#FF9800';
-    text.textContent = 'Offline (wacht op verbinding)';
-    text.style.color = '#FF9800';
-  }
+// De verbindingsregel hoort enkel bij een online kamer: in solo/AI-modus wordt er niets
+// gesynchroniseerd, dus "Verbonden" zou daar enkel misleiden.
+function showConnectionStatus(show){
+  const bar = document.getElementById('connectionStatus');
+  if(bar) bar.style.display = show ? 'flex' : 'none';
 }
 
 function startPolling(){
@@ -781,10 +969,8 @@ function startPolling(){
           if(remoteState){
             lastSuccessfulSync = Date.now();
             if(!isConnected){ updateConnectionStatus(true); }
-            if(!actionInFlight){
-              applyRemoteState(remoteState);
-              renderAll();
-            }
+            // handleRemoteState() bewaakt zelf of er een lokale actie of animatie loopt.
+            handleRemoteState(remoteState);
           }
         } catch(e){
           console.error('Fehler beim Verarbeiten von Zustandsänderung:', e);
@@ -882,12 +1068,10 @@ function backToMenu(){
   aiThinking = false;
   bypassTurnGate = false;
   state = null;
+  showConnectionStatus(false);
   document.getElementById('gamePanel').style.display = 'none';
   document.getElementById('lobbyWrap').style.display = 'flex';
-  document.getElementById('multiplayerPanel').style.display = 'none';
-  document.getElementById('soloPanel').style.display = 'none';
-  document.getElementById('aiColorPanel').style.display = 'none';
-  document.getElementById('lobbyMsg').textContent = '';
+  openMenuPanel(null);
   document.getElementById('roomInput').value = '';
 }
 
@@ -966,6 +1150,14 @@ function computeTowerChain(color, scope){
 // Generieke vlieg-animatie: een kloon van `card` vliegt van sourceEl naar destEl. Gebruikt door
 // alle verplaats-interacties (veld leggen, hold in/uit, toren opwaarderen, gewone zet).
 function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
+function nextFrame(){
+  return new Promise(res=>{
+    let done = false;
+    const finish = () => { if(!done){ done = true; res(); } };
+    requestAnimationFrame(finish);
+    setTimeout(finish, 60);
+  });
+}
 function chainIncludesHand(chain){ return chain.some(i=>i.source==='hand'); }
 function chainLabel(chain){ return chain.map(i=>cardText(i.card)).join(', '); }
 
@@ -988,7 +1180,7 @@ async function animateCardFly(sourceEl, destEl, card){
   document.body.appendChild(clone);
   const dx = (dstRect.left + dstRect.width/2) - (srcRect.left + srcRect.width/2);
   const dy = (dstRect.top + dstRect.height/2) - (srcRect.top + srcRect.height/2);
-  await new Promise(r=>requestAnimationFrame(r));
+  await nextFrame();
   clone.style.transform = `translate(${dx}px, ${dy}px) scale(0.85)`;
   clone.style.opacity = '0.35';
   await sleep(330);
@@ -1016,7 +1208,7 @@ async function animateCardSlide(sourceEl, destEl, card){
   document.body.appendChild(clone);
   const dx = (dstRect.left + dstRect.width/2) - (srcRect.left + srcRect.width/2);
   const dy = (dstRect.top + dstRect.height/2) - (srcRect.top + srcRect.height/2);
-  await new Promise(r=>requestAnimationFrame(r));
+  await nextFrame();
   clone.style.transform = `translate(${dx}px, ${dy}px)`;
   await sleep(270);
   clone.remove();
@@ -1072,7 +1264,7 @@ async function animateBlockCard(color, fromCell, toCell){
   document.body.appendChild(clone);
   const dx = (dstRect.left + dstRect.width/2) - (srcRect.left + srcRect.width/2);
   const dy = (dstRect.top + dstRect.height/2) - (srcRect.top + srcRect.height/2);
-  await new Promise(r=>requestAnimationFrame(r));
+  await nextFrame();
   clone.style.transform = `translate(${dx}px, ${dy}px)`;
   await sleep(390);
   clone.remove();
@@ -1203,7 +1395,7 @@ async function consumeBuildCandidate(color, item){
     }
   }
   renderAll();
-  await new Promise(r=>requestAnimationFrame(r));
+  await nextFrame();
 }
 
 async function chooseRevive(cardId){
