@@ -75,42 +75,109 @@ window.firebaseDB = {
    * Set up real-time listener for game state changes
    * Uses Server-Sent Events (SSE) for real-time updates
    */
+  /**
+   * Luistert naar wijzigingen in een kamer en roept callback aan met de volledige spelstand.
+   *
+   * Firebase duwt wijzigingen over een blijvende verbinding (server-sent events). Vroeger vroeg
+   * deze functie elke 1,5 seconde de hele stand opnieuw op; een zet van de tegenstander werd dan
+   * pas ergens tussen 0 en 1,6 seconde later zichtbaar, gemiddeld 0,8. Met duwen is dat ongeveer
+   * 0,23 seconde, en even snel elke keer — dat gelijkmatige is wat een spel soepel laat aanvoelen.
+   * Bovendien wordt er alleen nog data verstuurd als er echt iets verandert.
+   *
+   * Pollen blijft als vangnet bestaan: lukt de verbinding niet, dan schakelt hij daar vanzelf op
+   * terug, zodat het spel het in elk geval doet.
+   */
   onStateChange(roomCode, callback) {
-    // Firebase REST doesn't support real-time subscriptions via SSE well
-    // So we'll use polling instead (fallback to 1.5s polling like before)
-    let isListening = true;
-    let pollTimeout = null;
+    let luistert = true;
+    let bron = null;
+    let stopPollen = null;
+    let ietsOntvangen = false;
+    let fouten = 0;
 
+    const meld = (state) => {
+      if (!luistert || !state) return;
+      ietsOntvangen = true;
+      try { callback(state); }
+      catch (e) { console.error('Callback error:', e); }
+    };
+
+    const valTerugOpPollen = (reden) => {
+      if (!luistert || stopPollen) return;
+      console.warn('Live verbinding werkt niet, terug naar pollen:', reden);
+      if (bron) { try { bron.close(); } catch (e) {} bron = null; }
+      stopPollen = this._pollGameState(roomCode, meld);
+    };
+
+    // Sommige gebeurtenissen melden enkel dát er iets veranderde, of veranderen maar een stukje.
+    // Dan halen we gewoon de hele stand op: de rest van het spel verwacht een volledige stand.
+    const haalVolledigeStand = async () => {
+      try { meld(await this.loadGameState(roomCode)); }
+      catch (e) { console.error('Ophalen na wijziging mislukt:', e); }
+    };
+
+    const verwerk = (event) => {
+      if (!luistert) return;
+      fouten = 0;
+      let bericht = null;
+      try { bericht = JSON.parse(event.data); } catch (e) { return; }
+      if (!bericht) return;
+      // Een PUT op de wortel bevat de volledige stand; dat is wat saveGameState schrijft, dus dit
+      // is het normale geval en er hoeft niets extra opgehaald te worden.
+      if (bericht.path === '/' && bericht.data && typeof bericht.data === 'object') meld(bericht.data);
+      else haalVolledigeStand();
+    };
+
+    try {
+      const url = `${firebaseConfig.databaseURL}/rooms/${roomCode}/gameState.json`;
+      bron = new EventSource(url);
+      bron.addEventListener('put', verwerk);
+      bron.addEventListener('patch', verwerk);
+      // De kamer werd verwijderd of de toegang ingetrokken: pollen merkt dat vanzelf weer op.
+      bron.addEventListener('cancel', () => valTerugOpPollen('cancel'));
+      bron.addEventListener('auth_revoked', () => valTerugOpPollen('auth_revoked'));
+      bron.onerror = () => {
+        // EventSource probeert zelf opnieuw te verbinden. Alleen als er nog nooit iets binnenkwam
+        // en het blijft mislukken, gaan we ervan uit dat duwen hier niet werkt.
+        fouten++;
+        if (!ietsOntvangen && fouten >= 2) valTerugOpPollen('geen verbinding');
+      };
+    } catch (e) {
+      valTerugOpPollen(e.message);
+    }
+
+    // Komt het toestel terug uit de achtergrond, dan kan de verbinding onderweg gesneuveld zijn
+    // zonder dat we het merkten. Eén keer de stand ophalen haalt alles weer gelijk.
+    const bijTerugkeer = () => { if (luistert && !document.hidden) haalVolledigeStand(); };
+    document.addEventListener('visibilitychange', bijTerugkeer);
+
+    return () => {
+      luistert = false;
+      document.removeEventListener('visibilitychange', bijTerugkeer);
+      if (bron) { try { bron.close(); } catch (e) {} bron = null; }
+      if (stopPollen) stopPollen();
+    };
+  },
+
+  /** Het oude gedrag: elke 1,5 seconde de hele stand opvragen. Enkel nog als vangnet. */
+  _pollGameState(roomCode, meld) {
+    let luistert = true;
+    let timer = null;
+    let vorige = null;
     const poll = async () => {
-      if (!isListening) return;
-
+      if (!luistert) return;
       try {
         const state = await this.loadGameState(roomCode);
-        if (state && isListening) {
-          try {
-            callback(state);
-          } catch (e) {
-            console.error('Callback error:', e);
-          }
-        }
-      } catch (e) {
-        console.error('Poll error:', e);
+        // Alleen melden als er echt iets veranderd is. Zonder deze vergelijking kreeg het spel elke
+        // 1,5 seconde dezelfde stand opnieuw binnen, en kon een zet die net geanimeerd werd een
+        // tweede keer als "nieuw" gezien worden — dan speelde dezelfde animatie dubbel af.
+        const nu = state ? JSON.stringify(state) : null;
+        if (nu && nu !== vorige) { vorige = nu; meld(state); }
       }
-
-      // Schedule next poll only if still listening
-      if (isListening) {
-        pollTimeout = setTimeout(poll, 1500);
-      }
+      catch (e) { console.error('Poll error:', e); }
+      if (luistert) timer = setTimeout(poll, 1500);
     };
-
-    // Start polling asynchronously to avoid blocking
     setTimeout(() => poll().catch(e => console.error('Poll failed:', e)), 0);
-
-    // Return unsubscribe function
-    return () => {
-      isListening = false;
-      if (pollTimeout) clearTimeout(pollTimeout);
-    };
+    return () => { luistert = false; if (timer) clearTimeout(timer); };
   },
 
   /**
