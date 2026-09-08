@@ -974,6 +974,32 @@ function collectRemoteAnimations(prev, next){
     }
   });
 
+  // De winnende zet: een kaart die een vijandelijke toren verovert verdwijnt van het bord.
+  // attemptMove haalt hem van zijn vakje maar zet hem nergens neer, want het spel is op dat moment
+  // afgelopen. Daardoor stond hij niet in de nieuwe stand en kreeg de tegenstander géén animatie te
+  // zien van juist de belangrijkste zet van de partij. We leiden hem af uit de winnaar die er net
+  // bij is gekomen: de verdwenen kaart van die kleur die naast de veroverde toren lag.
+  if(next.winner && !prev.winner && animated.indexOf(next.winner) !== -1){
+    const torenCel = towerCellOf(other(next.winner));
+    const buren = neighbors(torenCel);
+    let bronCel = null, stuk = null;
+    Object.keys(before).forEach(id=>{
+      if(after[id] || bronCel) return;
+      const cel = before[id];
+      if(!buren.includes(cel)) return;
+      const p = pieceInStack(prev.board[cel], id);
+      if(p && p.owner === next.winner && p.kind === 'normal'){ bronCel = cel; stuk = p; }
+    });
+    if(bronCel && stuk){
+      out.push(async ()=>{
+        const vanCel = document.querySelector(`.cell[data-cell="${bronCel}"]`);
+        const srcEl = (vanCel && vanCel.querySelector('.card-face:not(.peek-dim)')) || vanCel;
+        const dstEl = document.querySelector(`.cell[data-cell="${torenCel}"]`);
+        await animateCardSlide(srcEl, dstEl, stuk);
+      });
+    }
+  }
+
   animated.forEach(owner=>{
     // Kaart die bij die speler in de hold belandt (vrijwillig gelegd of herleefd).
     const holdBefore = prev.hold ? prev.hold[owner] : null;
