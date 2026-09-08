@@ -754,9 +754,15 @@ async function flyFromOffBoard(color, destEl, card){
 // Bouwt de lijst animaties (als thunks) voor alles wat de tegenstander veranderd heeft.
 function collectRemoteAnimations(prev, next){
   const out = [];
-  if(!prev || !next || soloMode || aiMode || !myColor) return out;
+  if(!prev || !next || soloMode || aiMode) return out;
   if(document.hidden) return out; // niemand kijkt: meteen naar de eindstand
-  const opp = other(myColor);
+
+  // Wiens zetten moeten hier bewegen? Een speler ziet enkel die van zijn tegenstander: zijn eigen
+  // zetten zijn al geanimeerd op het moment dat hij ze deed. Een toeschouwer heeft geen eigen
+  // kleur en dus ook geen tegenstander — voor hem zijn álle zetten van iemand anders, dus tonen
+  // we ze allebei. Zonder dit verschoof het bord bij een toeschouwer zonder enige animatie.
+  const animated = myColor ? [other(myColor)] : ['red','black'];
+
   const before = boardCardCells(prev.board);
   const after  = boardCardCells(next.board);
 
@@ -764,7 +770,8 @@ function collectRemoteAnimations(prev, next){
     const to = after[id], from = before[id];
     if(from === to) return;
     const piece = pieceInStack(next.board[to], id);
-    if(!piece || piece.owner !== opp) return;
+    if(!piece || animated.indexOf(piece.owner) === -1) return;
+    const owner = piece.owner;
     if(from){
       out.push(async ()=>{
         const fromCellEl = document.querySelector(`.cell[data-cell="${from}"]`);
@@ -773,35 +780,37 @@ function collectRemoteAnimations(prev, next){
         await animateCardSlide(srcEl, dstEl, piece);
       });
     } else {
-      // Nieuw op het bord: ofwel uit de hold van de tegenstander, ofwel uit zijn hand.
-      const fromHold = !!(prev.hold && prev.hold[opp] && prev.hold[opp].id === id);
+      // Nieuw op het bord: ofwel uit de hold van die speler, ofwel uit zijn hand.
+      const fromHold = !!(prev.hold && prev.hold[owner] && prev.hold[owner].id === id);
       out.push(async ()=>{
         const dstEl = document.querySelector(`.cell[data-cell="${to}"]`);
         if(fromHold){
-          await animateCardFly(document.querySelector(`[data-hold-color="${opp}"]`), dstEl, piece);
+          await animateCardFly(document.querySelector(`[data-hold-color="${owner}"]`), dstEl, piece);
         } else {
-          await flyFromOffBoard(opp, dstEl, piece);
+          await flyFromOffBoard(owner, dstEl, piece);
         }
       });
     }
   });
 
-  // Kaart die bij de tegenstander in de hold belandt (vrijwillig gelegd of herleefd).
-  const oppHoldBefore = prev.hold ? prev.hold[opp] : null;
-  const oppHoldAfter  = next.hold ? next.hold[opp] : null;
-  if(oppHoldAfter && (!oppHoldBefore || oppHoldBefore.id !== oppHoldAfter.id) && !before[oppHoldAfter.id]){
-    out.push(async ()=>{
-      const dstEl = document.querySelector(`[data-hold-color="${opp}"]`);
-      await flyFromOffBoard(opp, dstEl, oppHoldAfter);
-    });
-  }
+  animated.forEach(owner=>{
+    // Kaart die bij die speler in de hold belandt (vrijwillig gelegd of herleefd).
+    const holdBefore = prev.hold ? prev.hold[owner] : null;
+    const holdAfter  = next.hold ? next.hold[owner] : null;
+    if(holdAfter && (!holdBefore || holdBefore.id !== holdAfter.id) && !before[holdAfter.id]){
+      out.push(async ()=>{
+        const dstEl = document.querySelector(`[data-hold-color="${owner}"]`);
+        await flyFromOffBoard(owner, dstEl, holdAfter);
+      });
+    }
 
-  // Blok-kaart van de tegenstander die geplaatst of verlegd wordt.
-  const blockFrom = blockCellOf(prev.board, opp);
-  const blockTo   = blockCellOf(next.board, opp);
-  if(blockTo && blockTo !== blockFrom){
-    out.push(async ()=> { await animateBlockCard(opp, blockFrom, blockTo); });
-  }
+    // Blok-kaart van die speler die geplaatst of verlegd wordt.
+    const blockFrom = blockCellOf(prev.board, owner);
+    const blockTo   = blockCellOf(next.board, owner);
+    if(blockTo && blockTo !== blockFrom){
+      out.push(async ()=> { await animateBlockCard(owner, blockFrom, blockTo); });
+    }
+  });
 
   return out;
 }
