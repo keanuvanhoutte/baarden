@@ -529,6 +529,28 @@ let lastSuccessfulSync = Date.now(); // Track last successful Firebase sync
 let actionInFlight = false;
 const storageKey = () => 'baarden:'+roomCode;
 
+// Een vast id waaraan de kamer je herkent, zodat je na een herlaadbeurt je eigen kleur terugkrijgt
+// in plaats van toeschouwer te worden. Belangrijk op gsm, waar de browser een tabblad op de
+// achtergrond zomaar mag weggooien en opnieuw laden; zonder dit kon je daarna niet meer spelen en
+// stond het bord weer vanuit de verkeerde kant.
+//
+// Het id staat per tabblad in sessionStorage, niet in localStorage. Dat is bewust: localStorage
+// wordt gedeeld door alle vensters van dezelfde browser, waardoor twee vensters op één computer
+// hetzelfde id zouden krijgen en dus dezelfde kleur zouden opeisen. sessionStorage hoort bij één
+// tabblad en overleeft een herlaadbeurt, wat precies is wat we nodig hebben.
+//
+// Sluit je het tabblad helemaal en open je een nieuw, dan ben je een nieuwe speler. Zijn beide
+// kleuren dan nog bezet, dan kom je binnen als toeschouwer — net als voorheen.
+function myClientId(){
+  let id = null;
+  try { id = sessionStorage.getItem('baarden:clientId'); } catch(e){}
+  if(!id){
+    id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,10);
+    try { sessionStorage.setItem('baarden:clientId', id); } catch(e){}
+  }
+  return id;
+}
+
 function createInitialState(){
   const board = {};
   ALL_CELLS.forEach(c => board[c]=null);
@@ -848,10 +870,23 @@ async function joinRoom(){
 
   roomCode = val;
 
+  // Eerst de kleur vastleggen, atomair en op naam van dit toestel. Pas daarna de spelstand, want
+  // wie Rood krijgt is degene die de kamer aanmaakt.
+  let claim;
+  try{
+    claim = await window.firebaseDB.claimSeat(roomCode, myClientId());
+    updateConnectionStatus(true);
+  } catch(e){
+    console.error('Zitplaats claimen mislukt:', e);
+    updateConnectionStatus(false);
+    document.getElementById('lobbyMsg').textContent = 'Kan de kamer niet binnenkomen. Controleer je verbinding en probeer opnieuw.';
+    return;
+  }
+  myColor = claim.color;
+
   let existing = null;
   try{
     existing = await window.firebaseDB.loadGameState(roomCode);
-    updateConnectionStatus(true);
   } catch(e){
     console.error('Fehler beim Laden des Spielzustands:', e);
     updateConnectionStatus(false);
@@ -859,10 +894,10 @@ async function joinRoom(){
     return;
   }
 
-  if(!existing){
+  if(!existing && myColor === 'red'){
+    // Alleen Rood maakt de kamer aan. Doordat de kleur atomair verdeeld is, kan er hoogstens één
+    // speler Rood zijn en schrijven er dus nooit twee tegelijk een verse partij over elkaar heen.
     state = createInitialState();
-    myColor = 'red';
-    state.players.red = true;
     pushLog('Rood is de kamer binnengekomen.');
     try{
       await window.firebaseDB.createRoom(roomCode, state);
@@ -872,13 +907,35 @@ async function joinRoom(){
       return;
     }
   } else {
+    if(!existing){
+      // Zwart was er eerder dan de partij van Rood: even wachten tot die klaarstaat.
+      for(let i=0; i<10 && !existing; i++){
+        await new Promise(r=>setTimeout(r,300));
+        try{ existing = await window.firebaseDB.loadGameState(roomCode); } catch(e){}
+      }
+      if(!existing){
+        document.getElementById('lobbyMsg').textContent = 'De andere speler is de kamer nog aan het opzetten. Probeer het zo nog eens.';
+        return;
+      }
+    }
     // Defensive: ensure state has required structure (Firebase strips null-only
     // sub-objects on write, e.g. hold:{red:null,black:null} can vanish entirely)
     state = hydrateState(existing);
 
-    if(!state.players.red){ myColor='red'; state.players.red=true; pushLog('Rood is de kamer binnengekomen.'); await saveState(); }
-    else if(!state.players.black){ myColor='black'; state.players.black=true; pushLog('Zwart is de kamer binnengekomen.'); await saveState(); }
-    else { myColor = null; }
+    // Kom je net binnen (niet terug na een herlaadbeurt), meld dat dan in het logboek. We schrijven
+    // enkel die twee velden: een volledige PUT zou een zet kunnen wissen die net is binnengekomen.
+    if(myColor && !claim.reclaimed){
+      pushLog(myColor==='red' ? 'Rood is de kamer binnengekomen.' : 'Zwart is de kamer binnengekomen.');
+      try{ await window.firebaseDB.patchGameState(roomCode, { log: state.log }); } catch(e){ console.error('Logregel schrijven mislukt:', e); }
+    }
+  }
+
+  // players is enkel nog weergave: de zitplaatsen op de server zijn de waarheid.
+  state.players.red = !!claim.seats && !!claim.seats.red;
+  state.players.black = !!claim.seats && !!claim.seats.black;
+
+  if(!myColor){
+    document.getElementById('lobbyMsg').textContent = 'Deze kamer heeft al twee spelers. Je kijkt mee als toeschouwer.';
   }
   document.getElementById('lobbyWrap').style.display='none';
   document.getElementById('gamePanel').style.display='block';

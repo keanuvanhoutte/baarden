@@ -161,6 +161,72 @@ window.firebaseDB = {
   },
 
   /**
+   * Claim een kleur in een kamer, atomair.
+   *
+   * De zitplaatsen staan op een eigen pad (/rooms/CODE/seats) en worden bijgehouden per clientId,
+   * niet als anonieme booleans. Dat lost twee dingen op:
+   *
+   *  - Herlaad je de pagina (of gooit je telefoon het tabblad weg), dan herken je jezelf aan je
+   *    clientId en krijg je je eigen kleur terug in plaats van toeschouwer te worden.
+   *  - Openen twee toestellen tegelijk dezelfde nieuwe kamer, dan kunnen ze niet allebei Rood
+   *    worden. De schrijfactie gebruikt een if-match op de ETag, dus precies één wint; de ander
+   *    krijgt 412 en probeert opnieuw tegen de verse waarde, en wordt dan Zwart.
+   *
+   * Geeft {color, seats} terug. color is null als beide plaatsen al door iemand anders bezet zijn.
+   */
+  async claimSeat(roomCode, clientId, maxAttempts = 6) {
+    const url = `${firebaseConfig.databaseURL}/rooms/${roomCode}/seats.json`;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const getRes = await fetch(url, { headers: { 'X-Firebase-ETag': 'true' } });
+      if (!getRes.ok) throw new Error(`Zitplaatsen lezen mislukt: HTTP ${getRes.status}`);
+      // Bestaat het pad nog niet, dan geeft Firebase de body null met ETag "null_etag"; die ETag
+      // is bruikbaar als if-match, zodat ook het allereerste claimen atomair verloopt.
+      const etag = getRes.headers.get('ETag') || 'null_etag';
+      const seats = (await getRes.json()) || {};
+
+      let color = null;
+      if (seats.red === clientId) color = 'red';
+      else if (seats.black === clientId) color = 'black';
+      else if (!seats.red) color = 'red';
+      else if (!seats.black) color = 'black';
+
+      if (!color) return { color: null, seats, full: true };
+      if (seats[color] === clientId) return { color, seats, reclaimed: true };
+
+      const next = { red: seats.red || null, black: seats.black || null };
+      next[color] = clientId;
+
+      const putRes = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'if-match': etag },
+        body: JSON.stringify(next)
+      });
+
+      if (putRes.ok) return { color, seats: next };
+      if (putRes.status !== 412) throw new Error(`Zitplaats claimen mislukt: HTTP ${putRes.status}`);
+      // 412: iemand anders schreef net voor ons. Volgende ronde leest de verse waarde.
+    }
+
+    throw new Error('Zitplaats claimen mislukt na meerdere pogingen.');
+  },
+
+  /**
+   * Werk een paar velden van de spelstand bij zonder de rest te overschrijven. Een volledige PUT
+   * zou de zet die de tegenstander net deed kunnen wissen.
+   */
+  async patchGameState(roomCode, partial) {
+    const url = `${firebaseConfig.databaseURL}/rooms/${roomCode}/gameState.json`;
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(partial)
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return true;
+  },
+
+  /**
    * Delete a room (cleanup)
    */
   async deleteRoom(roomCode) {
