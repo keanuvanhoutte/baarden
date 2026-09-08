@@ -17,6 +17,19 @@
     --cell-empty:#124a37;
     --cell-neutral:#1c5c46;
     --line:#2f6b53;
+
+    /* Kaartdesign. Een skin is niets anders dan een setje van deze waarden; zie CARD_SKINS in het
+       script. De standaard hieronder is het originele uiterlijk, zodat het spel er zonder gekozen
+       skin exact hetzelfde uitziet als voorheen. Puur visueel: geen enkele hiervan raakt de
+       spelregels, het aantal kaarten of wat er naar Firebase gaat. */
+    --card-bg:#f2ead9;
+    --card-red:#b3312c;
+    --card-black:#1a1a1a;
+    --card-radius:4px;
+    --card-shadow:0 1px 3px rgba(0,0,0,.6);
+    --card-frame:none;
+    --card-font:inherit;
+    --card-back:repeating-linear-gradient(135deg, #082a20, #082a20 3px, #10493a 3px, #10493a 6px);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html{ -webkit-text-size-adjust:100%; }
@@ -57,6 +70,15 @@
     box-shadow:0 3px 8px rgba(0,0,0,.35);
   }
   .menu-btn:active{ transform: translateY(1px); box-shadow:0 1px 4px rgba(0,0,0,.35); }
+  /* Hulpknoppen: kleiner en rustiger dan de hoofdacties erboven, zodat het oog eerst bij
+     Multiplayer en Solo terechtkomt. */
+  .menu-klein-rij{ display:flex; gap:10px; justify-content:center; margin:14px 0 0 0; }
+  .menu-btn-klein{
+    flex:0 1 auto; padding:8px 16px; margin:0; font-size:13px; min-height:0;
+    background:transparent; color:var(--cream); border:1px solid rgba(190,159,65,.55);
+    border-radius:999px; font-weight:bold; box-shadow:none; opacity:.85;
+  }
+  .menu-btn-klein:active{ transform: translateY(1px); }
   .menu-subpanel{
     background:rgba(0,0,0,.25); border:1px solid var(--line); border-radius:10px;
     padding:14px; margin:0 0 8px 0;
@@ -72,6 +94,41 @@
   /* Hoofdactie van het multiplayer-paneel op volle breedte: hij stond op halve breedte naast een
      volle-breedte "Terug"-knop, wat er onafgewerkt uitzag. */
   .subpanel-primary{ display:block; width:100%; margin:8px 0 0 0; text-align:center; }
+
+  /* Keuzelijst met kaartdesigns. Elke rij zet de variabelen van zijn eigen design, zodat de
+     voorbeeldkaartjes tonen waar je op klikt zonder dat je hoeft te kiezen om het te zien. */
+  .skin-rij{
+    display:flex; align-items:center; gap:12px; width:100%;
+    margin:8px 0 0 0; padding:10px; text-align:left;
+    background:rgba(0,0,0,.18); border:1px solid var(--line); border-radius:10px;
+    color:var(--cream); font-family:inherit; cursor:pointer;
+    user-select:none; touch-action:manipulation;
+  }
+  .skin-rij:active{ transform:translateY(1px); }
+  .skin-rij.gekozen{ border-color:var(--gold); background:rgba(190,159,65,.14); box-shadow:inset 0 0 0 1px var(--gold); }
+  .skin-merk{
+    margin-left:8px; font-size:10px; font-weight:bold; letter-spacing:.5px;
+    background:var(--gold); color:var(--felt-dark); border-radius:999px; padding:2px 8px;
+    vertical-align:middle;
+  }
+  .skin-proef{ display:flex; gap:4px; flex-shrink:0; }
+  .skin-kaart{
+    width:30px; height:42px; border-radius:var(--card-radius); background:var(--card-bg);
+    box-shadow:var(--card-shadow), var(--card-frame, 0 0 transparent);
+    font-family:var(--card-font); background-size:cover; background-position:center;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:11px; font-weight:bold; line-height:1.05;
+  }
+  .skin-kaart.red{ color:var(--card-red); }
+  .skin-kaart.black{ color:var(--card-black); }
+  .skin-rug{
+    width:30px; height:42px; border-radius:var(--card-radius); background:var(--card-back);
+    background-size:cover; background-position:center;
+    box-shadow:var(--card-shadow); border:1px solid var(--gold);
+  }
+  .skin-tekst{ min-width:0; }
+  .skin-naam{ font-weight:bold; color:var(--gold); font-size:14px; }
+  .skin-uitleg{ font-size:11px; opacity:.75; margin-top:2px; }
   .panel{
     max-width:520px; width:100%; margin:0 auto 10px auto;
     background:rgba(0,0,0,.25);
@@ -107,7 +164,8 @@
   .pile-mini{
     width:26px; height:36px; border-radius:3px; border:1px solid var(--gold);
     display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;
-    background:repeating-linear-gradient(135deg, var(--felt-dark), var(--felt-dark) 3px, #10493a 3px, #10493a 6px);
+    background:var(--card-back);
+    background-size:cover; background-position:center;
     position:relative;
   }
   .pile-mini.discard{ background:repeating-linear-gradient(135deg, #3a2f16, #3a2f16 3px, #4d3f1f 3px, #4d3f1f 6px); }
@@ -143,14 +201,17 @@
   .cell.tower-black{ box-shadow:inset 0 0 0 2px #444; }
 
   .card-face{
-    width:78%; height:78%; background:var(--cream); border-radius:4px;
+    width:78%; height:78%; background:var(--card-bg); border-radius:var(--card-radius);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    font-weight:bold; font-size:11px; box-shadow:0 1px 3px rgba(0,0,0,.6);
+    font-weight:bold; font-size:11px;
+    box-shadow:var(--card-shadow), var(--card-frame, 0 0 transparent);
+    font-family:var(--card-font);
+    background-size:cover; background-position:center;
     position:absolute; line-height:1.05;
   }
-  .card-face.red{ color:var(--red); }
-  .card-face.black{ color:var(--black); }
-  .card-face.tower-piece{ box-shadow:0 1px 3px rgba(0,0,0,.6), inset 0 0 0 2px var(--gold); }
+  .card-face.red{ color:var(--card-red); }
+  .card-face.black{ color:var(--card-black); }
+  .card-face.tower-piece{ box-shadow:var(--card-shadow), inset 0 0 0 2px var(--gold); }
   .peek-dim{ opacity:.55; filter:saturate(.7); }
   .block-face{
     width:78%; height:78%; border-radius:4px; position:absolute;
@@ -366,7 +427,20 @@
   <div id="menuButtons">
     <button class="menu-btn" onclick="openMenuPanel('multiplayer')">🌐 Multiplayer</button>
     <button class="menu-btn" onclick="openMenuPanel('solo')">Solo spelen</button>
-    <button class="menu-btn" onclick="openRules()">📖 Spelregels</button>
+    <div class="menu-klein-rij">
+      <button class="menu-btn-klein" onclick="openRules()">📖 Spelregels</button>
+      <button class="menu-btn-klein" onclick="openMenuPanel('skins')">🎨 Kaartdesigns</button>
+    </div>
+  </div>
+
+  <div id="skinPanel" class="menu-subpanel" style="display:none;">
+    <div class="subpanel-title">🎨 Kaartdesigns</div>
+    <div class="status-line" style="text-align:center; margin-top:0; opacity:.75; font-size:12px;">
+      Alleen jouw scherm verandert. Je tegenstander houdt zijn eigen design en het spel blijft
+      exact hetzelfde.
+    </div>
+    <div id="skinLijst"></div>
+    <button class="secondary subpanel-back" onclick="openMenuPanel(null)">← Terug</button>
   </div>
 
   <div id="multiplayerPanel" class="menu-subpanel" style="display:none;">
@@ -529,6 +603,104 @@ let lastSuccessfulSync = Date.now(); // Track last successful Firebase sync
 let actionInFlight = false;
 const storageKey = () => 'baarden:'+roomCode;
 
+/* ======================= KAARTDESIGNS =======================
+   Een design is enkel een setje CSS-waarden. Het verandert hoe een kaart eruitziet en verder
+   niets: het deck, het aantal kaarten, de regels en alles wat naar Firebase gaat blijven
+   ongewijzigd. De keuze staat in localStorage van dit toestel en wordt nooit meegestuurd, dus
+   twee spelers kunnen los van elkaar een ander design kiezen zonder dat het spel verschilt.
+
+   Een nieuw design toevoegen = één regel in deze lijst. Alle sleutels zijn optioneel; wat je
+   weglaat valt terug op het klassieke uiterlijk. Beschikbare sleutels:
+
+     --card-bg      achtergrond van de kaart (kleur, verloop, of url(...) voor een afbeelding)
+     --card-red     kleur van harten/ruiten
+     --card-black   kleur van schoppen/klaveren
+     --card-radius  afronding van de hoeken
+     --card-shadow  slagschaduw
+     --card-frame   extra rand, als inset box-shadow (bv. 'inset 0 0 0 1px #c8a')
+     --card-font    lettertype van de tekst op de kaart
+     --card-back    achterkant, gebruikt voor de trekstapel
+
+   Voor een design met afbeeldingen: zet --card-bg op url(...) met een data-URI, zodat het
+   bestand geen aparte download nodig heeft (het spel is één los HTML-bestand). */
+const CARD_SKINS = [
+  {
+    id: 'klassiek',
+    naam: 'Klassiek',
+    beschrijving: 'Het originele kaartje op crèmekleurig karton.',
+    vars: {}
+  },
+  {
+    id: 'middernacht',
+    naam: 'Middernacht',
+    beschrijving: 'Donkere kaart met lichte symbolen.',
+    vars: {
+      '--card-bg': 'linear-gradient(160deg,#252a33,#161a20)',
+      '--card-red': '#e8695c',
+      '--card-black': '#dfe4ea',
+      '--card-radius': '6px',
+      '--card-frame': 'inset 0 0 0 1px rgba(220,225,235,.35)',
+      '--card-back': 'repeating-linear-gradient(135deg,#161a20,#161a20 3px,#2b313b 3px,#2b313b 6px)'
+    }
+  }
+];
+
+const SKIN_OPSLAG = 'baarden:skin';
+
+// Het klassieke uiterlijk, identiek aan de standaardwaarden in :root. Elk design wordt hierop
+// gelegd, zodat een design dat maar een paar sleutels noemt toch een volledige set heeft. Anders
+// zou zo'n design de rest overnemen van wat er op dat moment actief is.
+const SKIN_DEFAULTS = {
+  '--card-bg': '#f2ead9',
+  '--card-red': '#b3312c',
+  '--card-black': '#1a1a1a',
+  '--card-radius': '4px',
+  '--card-shadow': '0 1px 3px rgba(0,0,0,.6)',
+  '--card-frame': 'none',
+  '--card-font': 'inherit',
+  '--card-back': 'repeating-linear-gradient(135deg, #082a20, #082a20 3px, #10493a 3px, #10493a 6px)'
+};
+
+function skinById(id){ return CARD_SKINS.find(s => s.id === id) || CARD_SKINS[0]; }
+
+/** De volledige set waarden van een design: de standaard, overschreven door wat het design zelf zegt. */
+function skinVars(skin){ return Object.assign({}, SKIN_DEFAULTS, skin.vars); }
+
+// De gekozen skin staat hier in het geheugen, en dát is de waarheid. Opslag is enkel om hem te
+// onthouden. Dat onderscheid is nodig omdat opslag niet overal werkt: in een privévenster, in de
+// ingebouwde bestandsviewer van sommige apps, of als de gebruiker site-gegevens blokkeert, mislukt
+// schrijven stilletjes. Las het label zijn waarde uit de opslag, dan bleef het na een keuze op het
+// oude design staan terwijl de kaarten wél veranderden.
+let actieveSkinId = null;
+
+// localStorage houdt de keuze vast over sessies heen. sessionStorage hoort bij één tabblad en gaat
+// voor: zonder dat zou een tweede venster op dezelfde computer de keuze van het eerste
+// overschrijven, want localStorage wordt door alle vensters van een browser gedeeld. Zo kunnen
+// twee spelers op één toestel toch elk hun eigen design hebben.
+function gekozenSkinId(){
+  if(actieveSkinId) return actieveSkinId;
+  let uitOpslag = null;
+  try { uitOpslag = sessionStorage.getItem(SKIN_OPSLAG); } catch(e){}
+  if(!uitOpslag){ try { uitOpslag = localStorage.getItem(SKIN_OPSLAG); } catch(e){} }
+  actieveSkinId = (uitOpslag && CARD_SKINS.some(s => s.id === uitOpslag)) ? uitOpslag : CARD_SKINS[0].id;
+  return actieveSkinId;
+}
+
+/** Zet de waarden van een design op de pagina. Alles wat een design niet noemt, wordt gewist zodat
+ *  er geen resten van het vorige design blijven hangen. */
+function pasSkinToe(id){
+  const root = document.documentElement;
+  Object.entries(skinVars(skinById(id))).forEach(([k,v]) => root.style.setProperty(k, v));
+}
+
+function kiesSkin(id){
+  actieveSkinId = id;                                          // altijd, ook zonder werkende opslag
+  try { sessionStorage.setItem(SKIN_OPSLAG, id); } catch(e){}  // geldt voor dit tabblad
+  try { localStorage.setItem(SKIN_OPSLAG, id); } catch(e){}    // en als startwaarde voor nieuwe
+  pasSkinToe(id);
+  renderSkinLijst();
+}
+
 // Een vast id waaraan de kamer je herkent, zodat je na een herlaadbeurt je eigen kleur terugkrijgt
 // in plaats van toeschouwer te worden. Belangrijk op gsm, waar de browser een tabblad op de
 // achtergrond zomaar mag weggooien en opnieuw laden; zonder dit kon je daarna niet meer spelen en
@@ -541,13 +713,18 @@ const storageKey = () => 'baarden:'+roomCode;
 //
 // Sluit je het tabblad helemaal en open je een nieuw, dan ben je een nieuwe speler. Zijn beide
 // kleuren dan nog bezet, dan kom je binnen als toeschouwer — net als voorheen.
+let clientIdInGeheugen = null;
 function myClientId(){
+  if(clientIdInGeheugen) return clientIdInGeheugen;
   let id = null;
   try { id = sessionStorage.getItem('baarden:clientId'); } catch(e){}
   if(!id){
     id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,10);
     try { sessionStorage.setItem('baarden:clientId', id); } catch(e){}
   }
+  // Ook onthouden in het geheugen: werkt de opslag niet, dan gaf elke aanroep anders een nieuw id
+  // en zou je jezelf binnen dezelfde sessie niet meer herkennen.
+  clientIdInGeheugen = id;
   return id;
 }
 
@@ -961,7 +1138,7 @@ async function joinRoom(){
 // Het menu toont maar één niveau tegelijk: een subpaneel VERVANGT de hoofdknoppen i.p.v. eronder
 // te verschijnen terwijl de aangeklikte knop bleef staan (dat las verwarrend). `null` = terug naar
 // de hoofdknoppen. Elk subpaneel heeft daarvoor zelf een "← Terug"-knop.
-const MENU_PANELS = { multiplayer:'multiplayerPanel', solo:'soloPanel', ai:'aiColorPanel' };
+const MENU_PANELS = { multiplayer:'multiplayerPanel', solo:'soloPanel', ai:'aiColorPanel', skins:'skinPanel' };
 
 function openMenuPanel(name){
   Object.values(MENU_PANELS).forEach(id => {
@@ -971,6 +1148,66 @@ function openMenuPanel(name){
   document.getElementById('menuButtons').style.display = name ? 'none' : 'block';
   if(name && MENU_PANELS[name]) document.getElementById(MENU_PANELS[name]).style.display = 'block';
   if(name !== 'multiplayer') document.getElementById('lobbyMsg').textContent = '';
+  if(name === 'skins') renderSkinLijst();
+}
+
+/** Tekent de keuzelijst. Elke rij toont echte kaartjes in dát design: de variabelen worden op de
+ *  rij zelf gezet, zodat elke preview zijn eigen uiterlijk heeft los van wat er gekozen is. */
+function renderSkinLijst(){
+  const el = document.getElementById('skinLijst');
+  if(!el) return;
+  const actief = gekozenSkinId();
+  el.innerHTML = '';
+
+  CARD_SKINS.forEach(skin => {
+    // Bewust een div en geen <button>: een knop mag volgens de HTML-regels geen blok-elementen
+    // bevatten, en deze rij bestaat uit divs met de voorbeeldkaartjes. Browsers gaan daar
+    // verschillend mee om en op sommige toestellen kwam de tik dan niet aan. Met role en tabindex
+    // blijft hij wel bedienbaar met toetsenbord en voorleessoftware.
+    const rij = document.createElement('div');
+    rij.className = 'skin-rij' + (skin.id === actief ? ' gekozen' : '');
+    rij.setAttribute('role', 'button');
+    rij.setAttribute('tabindex', '0');
+    rij.setAttribute('aria-pressed', skin.id === actief ? 'true' : 'false');
+    rij.onclick = () => kiesSkin(skin.id);
+    rij.onkeydown = (e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); kiesSkin(skin.id); } };
+
+    const proef = document.createElement('div');
+    proef.className = 'skin-proef';
+    Object.entries(skinVars(skin)).forEach(([k,v]) => proef.style.setProperty(k, v));
+
+    // Twee kaarten en een achterkant: genoeg om rood, zwart en de trekstapel te beoordelen.
+    [['A','♥','red'], ['10','♠','black']].forEach(([rank,symbool,kleur])=>{
+      const k = document.createElement('div');
+      k.className = 'skin-kaart ' + kleur;
+      k.innerHTML = '<div>'+rank+'</div><div>'+symbool+'</div>';
+      proef.appendChild(k);
+    });
+    const rug = document.createElement('div');
+    rug.className = 'skin-rug';
+    proef.appendChild(rug);
+
+    const tekst = document.createElement('div');
+    tekst.className = 'skin-tekst';
+    const naam = document.createElement('div');
+    naam.className = 'skin-naam';
+    naam.textContent = skin.naam;
+    if(skin.id === actief){
+      const merk = document.createElement('span');
+      merk.className = 'skin-merk';
+      merk.textContent = 'In gebruik';
+      naam.appendChild(merk);
+    }
+    const uitleg = document.createElement('div');
+    uitleg.className = 'skin-uitleg';
+    uitleg.textContent = skin.beschrijving;
+    tekst.appendChild(naam);
+    tekst.appendChild(uitleg);
+
+    rij.appendChild(proef);
+    rij.appendChild(tekst);
+    el.appendChild(rij);
+  });
 }
 
 function generateRoomCode(){
@@ -2695,6 +2932,7 @@ function renderHint(){
   }
 }
 
+pasSkinToe(gekozenSkinId());
 autoRejoin();
 
 </script>
