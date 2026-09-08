@@ -1,0 +1,54 @@
+name: Kamers opruimen
+
+# Verwijdert elke nacht de kamers waarin al 48 uur niet meer gespeeld is.
+#
+# Niet om ruimte te winnen — een kamer is ongeveer 3 KB en Firebase geeft 1 GB gratis, dus daar
+# loop je nooit tegenaan. Het gaat om hergebruik van codes: blijft een oude kamer bestaan en typt
+# iemand toevallig dezelfde code, dan komt hij in die oude partij terecht, en zijn de twee plaatsen
+# daar al bezet dan kan hij niet meespelen.
+#
+# Handmatig starten kan via "Run workflow" op het Actions-tabblad. Zet daar "proefdraai" op true om
+# eerst te zien wat er zou verdwijnen zonder iets te wissen.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'   # elke nacht om 03:17 UTC
+  workflow_dispatch:
+    inputs:
+      proefdraai:
+        description: 'Alleen tonen wat zou verdwijnen, niets verwijderen'
+        type: boolean
+        default: false
+      uren:
+        description: 'Aantal uren zonder zet waarna een kamer weg mag'
+        type: string
+        default: '48'
+
+permissions:
+  contents: read
+
+# Twee opruimbeurten tegelijk zouden elkaar dezelfde kamers zien verwijderen. Een lopende beurt
+# afbreken heeft geen zin, dus die maken we netjes af.
+concurrency:
+  group: kamers-opruimen
+  cancel-in-progress: false
+
+jobs:
+  opruimen:
+    name: Oude kamers verwijderen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      # Het script praat via de gewone REST-API met de database, zonder sleutel. Dat kan omdat de
+      # database-regels open staan. Worden die ooit dichtgezet, dan faalt deze stap zichtbaar en
+      # moet het script een service-account-token gaan meesturen.
+      - name: Opruimen
+        run: |
+          node scripts/kamers-opruimen.js \
+            ${{ inputs.proefdraai && '--dry-run' || '' }} \
+            --uren "${{ inputs.uren || '48' }}"

@@ -18,10 +18,13 @@ window.firebaseDB = {
     try {
       // Save directly to /rooms/{roomCode}/gameState.json
       const url = `${firebaseConfig.databaseURL}/rooms/${roomCode}/gameState.json`;
+      // updatedAt laat de opruimer zien wanneer er voor het laatst gespeeld is. Het is een
+      // server-tijdstempel: Firebase vult zelf zijn eigen klok in, zodat een toestel met een
+      // verkeerd ingestelde tijd niet zorgt dat een kamer te vroeg of nooit verdwijnt.
       const response = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state)
+        body: JSON.stringify({ ...state, updatedAt: { '.sv': 'timestamp' } })
       });
 
       if (!response.ok) {
@@ -130,7 +133,7 @@ window.firebaseDB = {
       const responseState = await fetch(urlState, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(initialState)
+        body: JSON.stringify({ ...initialState, updatedAt: { '.sv': 'timestamp' } })
       });
 
       if (!responseState.ok) {
