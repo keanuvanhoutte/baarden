@@ -946,6 +946,10 @@ async function joinRoom(){
   if(!myColor){
     document.getElementById('lobbyMsg').textContent = 'Deze kamer heeft al twee spelers. Je kijkt mee als toeschouwer.';
   }
+  // Onthoud de kamer voor dit tabblad, zodat we er na een herlaadbeurt vanzelf naar terugkeren.
+  // Staat naast het client-id in sessionStorage: allebei horen ze bij dit ene tabblad.
+  try { sessionStorage.setItem('baarden:room', roomCode); } catch(e){}
+
   document.getElementById('lobbyWrap').style.display='none';
   document.getElementById('gamePanel').style.display='block';
   document.getElementById('settingsControls').style.display='block';
@@ -1146,6 +1150,9 @@ function backToMenu(){
   }
   // Clean up old polling timer if it exists
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+  // Ga je zelf terug naar het menu, dan wil je daar ook blijven: de onthouden kamer wissen, anders
+  // zou het automatisch terugkeren je meteen weer naar binnen trekken.
+  try { sessionStorage.removeItem('baarden:room'); } catch(e){}
   roomCode = null;
   myColor = null;
   soloMode = false;
@@ -2653,6 +2660,27 @@ function renderReviveChoice(){
   el.appendChild(noneBtn);
 }
 
+// Keert dit tabblad na een herlaadbeurt vanzelf terug in zijn kamer. Nodig omdat een gsm die krap
+// in het geheugen zit een tabblad op de achtergrond mag weggooien: je kwam dan terug in het menu
+// en moest de code opnieuw intypen, terwijl je plaats nog gewoon van jou was.
+async function autoRejoin(){
+  let saved = null;
+  try { saved = sessionStorage.getItem('baarden:room'); } catch(e){}
+  if(!saved) return;
+
+  const msg = document.getElementById('lobbyMsg');
+  openMenuPanel('multiplayer');
+  document.getElementById('roomInput').value = saved;
+  msg.textContent = 'Bezig met terugkeren naar kamer ' + saved + '…';
+
+  try {
+    await joinRoom();
+  } catch(e){
+    console.error('Automatisch terugkeren mislukt:', e);
+    msg.textContent = 'Kon niet automatisch terugkeren naar kamer ' + saved + '. Vul de code opnieuw in.';
+  }
+}
+
 function renderHint(){
   const el = document.getElementById('hint');
   if(state.winner){ el.textContent=''; return; }
@@ -2666,6 +2694,8 @@ function renderHint(){
     el.textContent = '';
   }
 }
+
+autoRejoin();
 
 </script>
 </body>
