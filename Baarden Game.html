@@ -16,6 +16,7 @@
     --black:#1a1a1a;
     --cell-empty:#124a37;
     --cell-neutral:#1c5c46;
+    --cell-line:#2f6b53;
     --line:#2f6b53;
 
     /* Kaartdesign. Een skin is niets anders dan een setje van deze waarden; zie CARD_SKINS in het
@@ -35,7 +36,7 @@
   html{ -webkit-text-size-adjust:100%; }
   body{
     margin:0; min-height:100vh;
-    background:radial-gradient(ellipse at top, var(--felt) 0%, var(--felt-dark) 70%);
+    background:var(--table-bg, radial-gradient(ellipse at top, var(--felt) 0%, var(--felt-dark) 70%));
     font-family:'Georgia', 'Iowan Old Style', serif;
     color:var(--cream);
     padding:8px 8px calc(14px + env(safe-area-inset-bottom));
@@ -94,6 +95,20 @@
   /* Hoofdactie van het multiplayer-paneel op volle breedte: hij stond op halve breedte naast een
      volle-breedte "Terug"-knop, wat er onafgewerkt uitzag. */
   .subpanel-primary{ display:block; width:100%; margin:8px 0 0 0; text-align:center; }
+
+  /* Kop met een kleine terugknop linksboven. Alleen het designpaneel gebruikt dit: die lijst is
+     lang, en een terugknop onderaan betekende eerst helemaal naar beneden scrollen om weg te
+     kunnen. De knop ligt absoluut over de titelregel, zodat de titel gewoon in het midden van het
+     paneel blijft staan in plaats van opzij geduwd te worden. */
+  .subpanel-kop{ position:relative; }
+  .subpanel-terug{
+    position:absolute; left:-6px; top:-7px; z-index:1;
+    margin:0; padding:10px 12px; min-height:0;
+    background:transparent; border:none; box-shadow:none;
+    color:var(--gold); opacity:.6; font-size:12px; font-weight:bold; line-height:1;
+    letter-spacing:.5px;
+  }
+  .subpanel-terug:active{ opacity:1; }
 
   /* Keuzelijst met kaartdesigns. Elke rij zet de variabelen van zijn eigen design, zodat de
      voorbeeldkaartjes tonen waar je op klikt zonder dat je hoeft te kiezen om het te zien. */
@@ -186,7 +201,7 @@
   }
   .cell{
     aspect-ratio:1/1; background:var(--cell-empty);
-    border:1px solid var(--line); border-radius:6px;
+    border:1px solid var(--cell-line); border-radius:6px;
     display:flex; align-items:center; justify-content:center;
     position:relative; cursor:default; overflow:visible;
     user-select:none;
@@ -434,13 +449,15 @@
   </div>
 
   <div id="skinPanel" class="menu-subpanel" style="display:none;">
-    <div class="subpanel-title">🎨 Kaartdesigns</div>
+    <div class="subpanel-kop">
+      <button class="subpanel-terug" onclick="openMenuPanel(null)">← Terug</button>
+      <div class="subpanel-title">🎨 Kaartdesigns</div>
+    </div>
     <div class="status-line" style="text-align:center; margin-top:0; opacity:.75; font-size:12px;">
       Alleen jouw scherm verandert. Je tegenstander houdt zijn eigen design en het spel blijft
       exact hetzelfde.
     </div>
     <div id="skinLijst"></div>
-    <button class="secondary subpanel-back" onclick="openMenuPanel(null)">← Terug</button>
   </div>
 
   <div id="multiplayerPanel" class="menu-subpanel" style="display:none;">
@@ -609,8 +626,10 @@ const storageKey = () => 'baarden:'+roomCode;
    ongewijzigd. De keuze staat in localStorage van dit toestel en wordt nooit meegestuurd, dus
    twee spelers kunnen los van elkaar een ander design kiezen zonder dat het spel verschilt.
 
-   Een nieuw design toevoegen = één regel in deze lijst. Alle sleutels zijn optioneel; wat je
-   weglaat valt terug op het klassieke uiterlijk. Beschikbare sleutels:
+   Een nieuw design toevoegen = één regel in deze lijst. De lijst zelf loopt van licht naar donker
+   en van warm naar koel, zodat verwante kleuren bij elkaar staan; zet een nieuw design bij zijn
+   eigen kleur en niet onderaan. Alle sleutels zijn optioneel; wat je weglaat valt terug op het
+   klassieke uiterlijk. Beschikbare sleutels:
 
      --card-bg      achtergrond van de kaart (kleur, verloop, of url(...) voor een afbeelding)
      --card-red     kleur van harten/ruiten
@@ -620,6 +639,15 @@ const storageKey = () => 'baarden:'+roomCode;
      --card-frame   extra rand, als inset box-shadow (bv. 'inset 0 0 0 1px #c8a')
      --card-font    lettertype van de tekst op de kaart
      --card-back    achterkant, gebruikt voor de trekstapel
+     --felt         hoofdkleur van de speeltafel achter het bord
+     --felt-dark    donkere kleur van de tafel; ook menu's en de tekst op gouden knoppen
+     --table-bg     volledige tafelachtergrond; overschrijft het verloop van --felt
+     --cell-empty   leeg veldvakje
+     --cell-neutral neutraal veldvakje (de middenrij)
+     --cell-line    randje rond een veldvakje; los van --line, dat de panelen omlijnt
+
+   De laatste drie horen bij het design maar staan niet op de kaart: ze kleuren de tafel eronder
+   mee zodra je het design kiest. Ze hebben geen eigen keuze in het menu.
 
    Voor een design met afbeeldingen: zet --card-bg op url(...) met een data-URI, zodat het
    bestand geen aparte download nodig heeft (het spel is één los HTML-bestand). */
@@ -631,16 +659,628 @@ const CARD_SKINS = [
     vars: {}
   },
   {
-    id: 'middernacht',
-    naam: 'Middernacht',
-    beschrijving: 'Donkere kaart met lichte symbolen.',
+    id: 'perkament',
+    naam: 'Perkament',
+    beschrijving: 'Warm karton met een gestempelde rand.',
     vars: {
-      '--card-bg': 'linear-gradient(160deg,#252a33,#161a20)',
-      '--card-red': '#e8695c',
-      '--card-black': '#dfe4ea',
+      '--card-bg': 'radial-gradient(120% 100% at 50% 0%,rgba(255,255,255,.9),rgba(0,0,0,.06)),repeating-linear-gradient(45deg,rgba(120,90,40,.055) 0 2px,transparent 2px 5px),#f6ecd6',
+      '--card-red': '#a8352b',
+      '--card-black': '#241d16',
+      '--card-radius': '5px',
+      '--card-shadow': '0 2px 5px rgba(0,0,0,.55)',
+      '--card-frame': 'inset 0 0 0 1px rgba(120,90,40,.5), inset 0 0 0 3px rgba(255,252,244,.85), inset 0 0 0 4px rgba(120,90,40,.22)',
+      '--card-font': "'Iowan Old Style','Palatino Linotype',Georgia,serif",
+      '--card-back': 'repeating-linear-gradient(45deg,rgba(190,159,65,.30) 0 1px,transparent 1px 6px),repeating-linear-gradient(-45deg,rgba(190,159,65,.30) 0 1px,transparent 1px 6px),linear-gradient(160deg,#7d2823,#571a16)',
+      '--felt': '#5a3a26',
+      '--felt-dark': '#1f130c',
+      '--table-bg': 'repeating-linear-gradient(90deg,rgba(120,90,40,.14) 0 2px,transparent 2px 30px),radial-gradient(ellipse at top,#65432b,#1a1009 76%)',
+      '--cell-empty': '#805336',
+      '--cell-neutral': '#986240',
+      '--cell-line': '#ad7149'
+    }
+  },
+  {
+    id: 'ivoor',
+    naam: 'Ivoor',
+    beschrijving: 'Bot-wit met een dunne dubbele lijst.',
+    vars: {
+      '--card-bg': 'linear-gradient(180deg,#fdf8ec,#efe6d2)',
+      '--card-red': '#a02a2a',
+      '--card-black': '#2b2519',
+      '--card-radius': '5px',
+      '--card-shadow': '0 2px 5px rgba(0,0,0,.5)',
+      '--card-frame': 'inset 0 0 0 1px rgba(120,100,60,.4), inset 0 0 0 2px rgba(255,255,255,.9), inset 0 0 0 3px rgba(120,100,60,.25)',
+      '--card-font': "'Iowan Old Style',Georgia,serif",
+      '--card-back': 'repeating-linear-gradient(90deg,rgba(120,100,60,.3) 0 1px,transparent 1px 5px),#d9cdb0',
+      '--felt': '#6b6350',
+      '--felt-dark': '#221f18',
+      '--cell-empty': '#8c8269',
+      '--cell-neutral': '#9f967f',
+      '--cell-line': '#b0a996'
+    }
+  },
+  {
+    id: 'poster',
+    naam: 'Vintage Poster',
+    beschrijving: 'Verschoten crème met een rode dubbelrand.',
+    vars: {
+      '--card-bg': 'linear-gradient(180deg,#f7ecd8,#e9d9bd)',
+      '--card-red': '#c0392b',
+      '--card-black': '#2b2b2b',
+      '--card-radius': '2px',
+      '--card-shadow': '0 2px 5px rgba(0,0,0,.5)',
+      '--card-frame': 'inset 0 0 0 2px #c0392b, inset 0 0 0 3px #f7ecd8, inset 0 0 0 4px #2b2b2b',
+      '--card-font': "'Courier New',monospace",
+      '--card-back': 'repeating-linear-gradient(0deg,#c0392b 0 3px,#f7ecd8 3px 6px)',
+      '--felt': '#8a6f52',
+      '--felt-dark': '#3a2c1c',
+      '--table-bg': 'repeating-linear-gradient(45deg,rgba(192,57,43,.10) 0 12px,transparent 12px 24px),radial-gradient(ellipse at top,#a08360,#332618 75%)',
+      '--cell-empty': '#ab9072',
+      '--cell-neutral': '#bca78f',
+      '--cell-line': '#ccbca9'
+    }
+  },
+  {
+    id: 'verschroeid',
+    naam: 'Perkament Verbrand',
+    beschrijving: 'Crème met verschroeide randen.',
+    vars: {
+      '--card-bg': 'radial-gradient(70% 65% at 50% 45%,#f6e9cd 55%,#c99a5c 80%,#5f3a17)',
+      '--card-red': '#93211a',
+      '--card-black': '#2a1d0d',
+      '--card-radius': '4px',
+      '--card-shadow': '0 2px 6px rgba(0,0,0,.6)',
+      '--card-frame': 'inset 0 0 0 1px rgba(70,40,15,.6)',
+      '--card-font': "'Iowan Old Style',Georgia,serif",
+      '--card-back': 'radial-gradient(circle at 50% 50%,#8a5a24,#3a2210 70%,#170d05)',
+      '--felt': '#6b4a24',
+      '--felt-dark': '#241408',
+      '--table-bg': 'linear-gradient(90deg,#2a1708 0 3%,#7a4f22 3% 7%,rgba(0,0,0,0) 9%),linear-gradient(270deg,#2a1708 0 3%,#7a4f22 3% 7%,rgba(0,0,0,0) 9%),linear-gradient(180deg,rgba(50,25,8,.85) 0 4%,rgba(120,70,25,.35) 8%,transparent 14%),linear-gradient(0deg,rgba(50,25,8,.85) 0 4%,rgba(120,70,25,.35) 8%,transparent 14%),repeating-linear-gradient(90deg,rgba(120,80,35,.14) 0 1px,transparent 1px 34px),radial-gradient(circle at 30% 45%,rgba(140,30,20,.35) 0 3px,transparent 5px),radial-gradient(ellipse 90% 80% at 50% 50%,#f0dcaf,#c49a5e 62%,#8a5a2c 88%)',
+      '--cell-empty': '#916531',
+      '--cell-neutral': '#a97639',
+      '--cell-line': '#bf8642'
+    }
+  },
+  {
+    id: 'sneeuw',
+    naam: 'Sneeuw',
+    beschrijving: 'Koel wit kaartje met een haarfijne rand.',
+    vars: {
+      '--card-bg': 'linear-gradient(180deg,#ffffff,#eef1f5)',
+      '--card-red': '#c22a34',
+      '--card-black': '#1b2733',
+      '--card-radius': '4px',
+      '--card-shadow': '0 1px 3px rgba(0,0,0,.5)',
+      '--card-frame': 'inset 0 0 0 1px rgba(27,39,51,.18)',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'repeating-linear-gradient(135deg,#41546b 0 3px,#4d6178 3px 6px)',
+      '--felt': '#41546b',
+      '--felt-dark': '#141b24',
+      '--table-bg': 'radial-gradient(circle at 22% 18%,rgba(255,255,255,.9) 0 1.4px,transparent 2.2px) 0 0/48px 52px,radial-gradient(circle at 68% 62%,rgba(255,255,255,.65) 0 1.8px,transparent 2.6px) 0 0/76px 84px,radial-gradient(circle at 40% 40%,rgba(255,255,255,.45) 0 1px,transparent 1.8px) 0 0/30px 34px,radial-gradient(circle at 50% 50%,rgba(255,196,90,.85) 0 2px,transparent 3px) 12px 74%/56px 20px repeat-x,conic-gradient(from 0deg at 50% 0%,transparent 0 160deg,#0d2c1e 160deg 200deg,transparent 200deg) 0 100%/40px 58px repeat-x,conic-gradient(from 0deg at 50% 0%,transparent 0 160deg,#082016 160deg 200deg,transparent 200deg) 20px 100%/56px 80px repeat-x,linear-gradient(0deg,#e8eef5 0 9%,transparent 9%),radial-gradient(ellipse 90% 60% at 50% 0%,#5d7590,#141b24 78%)',
+      '--cell-empty': '#587291',
+      '--cell-neutral': '#6a85a4',
+      '--cell-line': '#7e96b1'
+    }
+  },
+  {
+    id: 'vuurtoren',
+    naam: 'Vuurtoren',
+    beschrijving: 'Wit blad met een rood-wit gestreepte rug.',
+    vars: {
+      '--card-bg': '#fbfbf9',
+      '--card-red': '#d81e2c',
+      '--card-black': '#14171a',
+      '--card-radius': '5px',
+      '--card-shadow': '0 2px 5px rgba(0,0,0,.5)',
+      '--card-frame': 'inset 0 0 0 3px #d81e2c, inset 0 0 0 4px #fbfbf9',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'repeating-linear-gradient(45deg,#d81e2c 0 4px,#fbfbf9 4px 8px)',
+      '--felt': '#1c3a4a',
+      '--felt-dark': '#07121a',
+      '--table-bg': 'conic-gradient(from 196deg at 78% 8%,rgba(255,244,200,.30) 0 9deg,transparent 9deg 46deg,rgba(255,244,200,.18) 46deg 53deg,transparent 53deg),radial-gradient(circle at 78% 8%,rgba(255,246,210,.95) 0 4px,rgba(255,220,130,.5) 7px,transparent 16px),linear-gradient(0deg,#08161f 0 6%,transparent 6%),repeating-linear-gradient(90deg,transparent 0 74px,#0a1b26 74px 86px,transparent 86px 100px) 0 100%/100% 30px no-repeat,linear-gradient(180deg,transparent 0 6%,#0d1e2a 6% 8%,transparent 8%) 74% 0/26px 100% no-repeat,repeating-linear-gradient(0deg,rgba(200,235,255,.10) 0 1px,transparent 1px 9px) 0 84%/100% 16%,radial-gradient(ellipse 100% 70% at 78% 0%,#26506b,#06101a 74%)',
+      '--cell-empty': '#2a5870',
+      '--cell-neutral': '#326a86',
+      '--cell-line': '#3a7a9b'
+    }
+  },
+  {
+    id: 'marmer',
+    naam: 'Roze Marmer',
+    beschrijving: 'Geaderde steen, koelwit.',
+    vars: {
+      '--card-bg': 'repeating-linear-gradient(72deg,rgba(120,80,95,.20) 0 1px,transparent 1px 9px),repeating-linear-gradient(28deg,rgba(120,80,95,.12) 0 1px,transparent 1px 14px),linear-gradient(150deg,#fdf1f2,#ecd9de)',
+      '--card-red': '#a3243f',
+      '--card-black': '#2e242a',
+      '--card-radius': '5px',
+      '--card-shadow': '0 2px 6px rgba(0,0,0,.5)',
+      '--card-frame': 'inset 0 0 0 1px rgba(150,110,120,.5)',
+      '--card-font': 'Georgia, serif',
+      '--card-back': 'repeating-linear-gradient(72deg,rgba(255,255,255,.3) 0 1px,transparent 1px 7px),linear-gradient(150deg,#8d5566,#4b2a35)',
+      '--felt': '#5e3a46',
+      '--felt-dark': '#211219',
+      '--table-bg': 'repeating-linear-gradient(72deg,rgba(255,255,255,.10) 0 1px,transparent 1px 22px),repeating-linear-gradient(24deg,rgba(255,255,255,.06) 0 1px,transparent 1px 38px),radial-gradient(ellipse at top,#6c4250,#1b0f15 76%)',
+      '--cell-empty': '#845262',
+      '--cell-neutral': '#9c6173',
+      '--cell-line': '#a87484'
+    }
+  },
+  {
+    id: 'bloesem',
+    naam: 'Kersenbloesem',
+    beschrijving: 'Zacht roze met een witte rand.',
+    vars: {
+      '--card-bg': 'linear-gradient(180deg,#ffe4ed,#f6c6d8)',
+      '--card-red': '#b81d55',
+      '--card-black': '#3b2029',
+      '--card-radius': '8px',
+      '--card-shadow': '0 2px 6px rgba(0,0,0,.45)',
+      '--card-frame': 'inset 0 0 0 2px rgba(255,255,255,.9)',
+      '--card-font': 'Georgia, serif',
+      '--card-back': 'radial-gradient(circle at 50% 50%,rgba(255,255,255,.55) 0 1.5px,transparent 2px) 0 0/8px 8px,linear-gradient(160deg,#e07aa0,#a83a68)',
+      '--felt': '#7a3a58',
+      '--felt-dark': '#2c1220',
+      '--table-bg': 'radial-gradient(circle at 20% 30%,rgba(255,200,220,.5) 0 3px,transparent 4px) 0 0/70px 70px,radial-gradient(circle at 65% 70%,rgba(255,225,235,.4) 0 2px,transparent 3px) 0 0/48px 48px,radial-gradient(ellipse at top,#8a4363,#2c1220 75%)',
+      '--cell-empty': '#a64f77',
+      '--cell-neutral': '#b5658a',
+      '--cell-line': '#c07b9a'
+    }
+  },
+  {
+    id: 'holo',
+    naam: 'Holografisch',
+    beschrijving: 'Pastelfolie die van hoek verschiet.',
+    vars: {
+      '--card-bg': 'conic-gradient(from 210deg at 30% 20%,#ffd6e8,#d9f0ff,#d8ffe6,#fff6c9,#ecd9ff,#ffd6e8)',
+      '--card-red': '#b0184a',
+      '--card-black': '#1f1b2e',
       '--card-radius': '6px',
-      '--card-frame': 'inset 0 0 0 1px rgba(220,225,235,.35)',
-      '--card-back': 'repeating-linear-gradient(135deg,#161a20,#161a20 3px,#2b313b 3px,#2b313b 6px)'
+      '--card-shadow': '0 2px 8px rgba(120,60,180,.5)',
+      '--card-frame': 'inset 0 0 0 1px rgba(255,255,255,.9), inset 0 0 0 2px rgba(120,90,160,.35)',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'conic-gradient(from 0deg,#8be9ff,#ff9ad5,#ffe98b,#9affc4,#8be9ff)',
+      '--felt': '#3b2c52',
+      '--felt-dark': '#150f22',
+      '--table-bg': 'conic-gradient(from 140deg at 30% 10%,rgba(139,233,255,.22),rgba(255,154,213,.20),rgba(255,233,139,.16),rgba(154,255,196,.18),rgba(139,233,255,.22)),radial-gradient(ellipse at top,#3b2c52,#0e0a18 72%)',
+      '--cell-empty': '#5c447f',
+      '--cell-neutral': '#70529a',
+      '--cell-line': '#7f62ab'
+    }
+  },
+  {
+    id: 'bladgoud',
+    naam: 'Bladgoud',
+    beschrijving: 'Geslagen goudfolie met donkere inkt.',
+    vars: {
+      '--card-bg': 'linear-gradient(115deg,#8a6b21,#e8cf7a 18%,#fff6d3 32%,#d9b654 48%,#a5822c 63%,#f2e0a4 82%,#b48f2e)',
+      '--card-red': '#8f1f1f',
+      '--card-black': '#241c08',
+      '--card-radius': '2px',
+      '--card-shadow': '0 2px 6px rgba(0,0,0,.65)',
+      '--card-frame': 'inset 0 0 0 1px rgba(80,60,10,.55)',
+      '--card-font': "'Iowan Old Style',Georgia,serif",
+      '--card-back': 'repeating-conic-gradient(from 0deg at 50% 50%,#d9b654 0deg 6deg,#12100a 6deg 12deg)',
+      '--felt': '#2c2413',
+      '--felt-dark': '#100d07',
+      '--table-bg': 'radial-gradient(circle at 50% 50%,#f4dc93 0 4px,#a5822c 4.5px,transparent 5.5px) 0 100%/22px 22px repeat-x,radial-gradient(circle at 50% 50%,#e8cf7a 0 5px,#8a6b21 5.5px,transparent 6.5px) 11px calc(100% - 13px)/26px 26px repeat-x,radial-gradient(circle at 50% 50%,#d9b654 0 6px,#6d5417 6.5px,transparent 7.5px) 0 calc(100% - 26px)/34px 30px repeat-x,radial-gradient(ellipse 40% 30% at 18% 22%,rgba(255,190,90,.45),transparent 70%),radial-gradient(ellipse 40% 30% at 82% 22%,rgba(255,190,90,.35),transparent 70%),repeating-linear-gradient(90deg,rgba(255,255,255,.04) 0 1px,transparent 1px 46px),radial-gradient(ellipse 120% 90% at 50% 0%,#3a2f18,#0a0804 72%)',
+      '--cell-empty': '#504223',
+      '--cell-neutral': '#64522c',
+      '--cell-line': '#756133'
+    }
+  },
+  {
+    id: 'zonnewijzer',
+    naam: 'Zonnewijzer',
+    beschrijving: 'Okergeel met bruine inkt.',
+    vars: {
+      '--card-bg': 'radial-gradient(85% 75% at 50% 15%,#ffd67a,#e0a231)',
+      '--card-red': '#8c1f14',
+      '--card-black': '#3d2408',
+      '--card-radius': '7px',
+      '--card-shadow': '0 2px 6px rgba(0,0,0,.55)',
+      '--card-frame': 'inset 0 0 0 2px rgba(92,52,16,.75)',
+      '--card-font': 'Georgia, serif',
+      '--card-back': 'repeating-conic-gradient(from 0deg at 50% 50%,#e0a231 0deg 8deg,#5c3410 8deg 16deg)',
+      '--felt': '#6d4a1c',
+      '--felt-dark': '#26170a',
+      '--table-bg': 'repeating-conic-gradient(from 0deg at 50% 0%,rgba(255,214,122,.16) 0deg 4deg,transparent 4deg 12deg),radial-gradient(ellipse at top,#7d5620,#1d1108 74%)',
+      '--cell-empty': '#946426',
+      '--cell-neutral': '#ac752c',
+      '--cell-line': '#c48432'
+    }
+  },
+  {
+    id: 'terracotta',
+    naam: 'Terracotta',
+    beschrijving: 'Gebakken klei met een warme rand.',
+    vars: {
+      '--card-bg': 'linear-gradient(170deg,#e08a5e,#c46840)',
+      '--card-red': '#5e1008',
+      '--card-black': '#2c1509',
+      '--card-radius': '6px',
+      '--card-shadow': '0 2px 5px rgba(0,0,0,.5)',
+      '--card-frame': 'inset 0 0 0 1px rgba(90,40,20,.55)',
+      '--card-font': 'Georgia, serif',
+      '--card-back': 'repeating-linear-gradient(90deg,rgba(255,225,200,.25) 0 2px,transparent 2px 7px),linear-gradient(160deg,#a44f2c,#5e2a15)',
+      '--felt': '#7a4a33',
+      '--felt-dark': '#2e1a12',
+      '--cell-empty': '#a36344',
+      '--cell-neutral': '#b87655',
+      '--cell-line': '#c38b6f'
+    }
+  },
+  {
+    id: 'koper',
+    naam: 'Koper',
+    beschrijving: 'Geoxideerd metaal met groene aanslag.',
+    vars: {
+      '--card-bg': 'linear-gradient(125deg,#7a3a1c,#c9764a 25%,#f0b48a 40%,#a85630 60%,#6d3418)',
+      '--card-red': '#5c1410',
+      '--card-black': '#20140c',
+      '--card-radius': '4px',
+      '--card-shadow': '0 2px 6px rgba(0,0,0,.6)',
+      '--card-frame': 'inset 0 0 0 1px rgba(60,110,80,.7)',
+      '--card-font': 'Georgia, serif',
+      '--card-back': 'repeating-linear-gradient(45deg,rgba(60,140,110,.4) 0 2px,transparent 2px 6px),linear-gradient(160deg,#8c4622,#4a2411)',
+      '--felt': '#4a5a4a',
+      '--felt-dark': '#1a2419',
+      '--table-bg': 'radial-gradient(ellipse 22% 20% at 24% 74%,rgba(255,170,60,.85),rgba(255,110,20,.35) 45%,transparent 76%),repeating-linear-gradient(90deg,transparent 0 30px,rgba(200,120,70,.5) 30px 34px,transparent 34px 72px) 0 0/100% 42px no-repeat,repeating-linear-gradient(90deg,transparent 0 18px,#7a4426 18px 46px,transparent 46px 72px) 0 6px/100% 30px no-repeat,repeating-linear-gradient(45deg,rgba(60,140,110,.16) 0 3px,transparent 3px 11px),linear-gradient(0deg,#20281c 0 16%,transparent 16%),radial-gradient(ellipse 110% 80% at 30% 30%,#5b6b55,#131a12 74%)',
+      '--cell-empty': '#637963',
+      '--cell-neutral': '#738d73',
+      '--cell-line': '#889d88'
+    }
+  },
+  {
+    id: 'magma',
+    naam: 'Magma',
+    beschrijving: 'Zwart basalt met een gloeiende onderrand.',
+    vars: {
+      '--card-bg': 'radial-gradient(60% 50% at 50% 110%,#ff6a1f,rgba(255,106,31,0) 70%),repeating-linear-gradient(115deg,#1a1512 0 3px,#241c17 3px 6px)',
+      '--card-red': '#ffb057',
+      '--card-black': '#ffe9d2',
+      '--card-radius': '5px',
+      '--card-shadow': '0 2px 8px rgba(255,80,0,.45)',
+      '--card-frame': 'inset 0 0 0 1px rgba(255,120,40,.7), inset 0 -6px 10px rgba(255,90,20,.35)',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'radial-gradient(circle at 50% 100%,#ff5a12,#3a0f04 60%,#120604)',
+      '--felt': '#2a1a12',
+      '--felt-dark': '#0d0603',
+      '--table-bg': 'radial-gradient(circle at 30% 20%,rgba(255,180,70,.95) 0 1.3px,transparent 2.2px) 0 0/58px 74px,radial-gradient(circle at 70% 62%,rgba(255,130,40,.8) 0 1.7px,transparent 2.6px) 0 0/104px 128px,radial-gradient(ellipse 16% 9% at 50% 41%,rgba(255,240,180,.95),rgba(255,130,30,.6) 45%,transparent 78%),conic-gradient(from 0deg at 50% 0%,transparent 0 175.4deg,rgba(255,190,90,.95) 175.4deg 177deg,transparent 177deg 179deg,rgba(255,120,30,.9) 179deg 181deg,transparent 181deg 183.4deg,rgba(255,160,60,.9) 183.4deg 185deg,transparent 185deg) 50% 100%/460px 172px no-repeat,conic-gradient(from 0deg at 50% 0%,transparent 0 151.4deg,rgba(255,150,60,.55) 151.4deg 152.6deg,#120804 152.6deg 207.4deg,rgba(255,150,60,.55) 207.4deg 208.6deg,transparent 208.6deg) 50% 100%/470px 176px no-repeat,conic-gradient(from 0deg at 50% 0%,transparent 0 147.4deg,rgba(255,120,40,.35) 147.4deg 148.6deg,#080403 148.6deg 211.4deg,rgba(255,120,40,.35) 211.4deg 212.6deg,transparent 212.6deg) 16% 100%/340px 124px no-repeat,conic-gradient(from 0deg at 50% 0%,transparent 0 147.4deg,rgba(255,120,40,.35) 147.4deg 148.6deg,#080403 148.6deg 211.4deg,rgba(255,120,40,.35) 211.4deg 212.6deg,transparent 212.6deg) 88% 100%/310px 112px no-repeat,radial-gradient(ellipse 55% 16% at 50% 100%,rgba(255,150,50,.55),transparent 74%),radial-gradient(ellipse 22% 34% at 50% 2%,rgba(255,120,40,.30),transparent 72%),radial-gradient(ellipse 130% 90% at 50% 8%,#63200a,#1d0805 58%,#090201)',
+      '--cell-empty': '#563625',
+      '--cell-neutral': '#6d452f',
+      '--cell-line': '#825138'
+    }
+  },
+  {
+    id: 'bloedmaan',
+    naam: 'Bloedmaan',
+    beschrijving: 'Bordeaux kaart met gloed en een gouden rand.',
+    vars: {
+      '--card-bg': 'radial-gradient(70% 60% at 50% 25%,#7e1c22,#2c0709)',
+      '--card-red': '#ff9aa2',
+      '--card-black': '#f7e3c8',
+      '--card-radius': '6px',
+      '--card-shadow': '0 3px 8px rgba(0,0,0,.75)',
+      '--card-frame': 'inset 0 0 0 1px rgba(224,178,106,.9), inset 0 0 0 3px rgba(0,0,0,.35), inset 0 0 12px rgba(255,140,120,.35)',
+      '--card-font': "'Iowan Old Style',Georgia,serif",
+      '--card-back': 'repeating-conic-gradient(from 0deg at 50% 50%,rgba(224,178,106,.2) 0deg 4deg,transparent 4deg 12deg),radial-gradient(circle,#8d2026,#1b0405)',
+      '--felt': '#33131a',
+      '--felt-dark': '#0f0407',
+      '--table-bg': 'radial-gradient(circle at 50% 22%,#ff5a4a 0 7%,rgba(255,90,74,.55) 9%,rgba(192,57,43,.25) 16%,transparent 34%),repeating-linear-gradient(90deg,transparent 0 18px,#150609 18px 40px,transparent 40px 58px) 0 100%/100% 46px no-repeat,repeating-linear-gradient(90deg,transparent 0 8px,#0d0406 8px 26px,transparent 26px 48px) 0 100%/100% 66px no-repeat,linear-gradient(0deg,rgba(255,140,120,.14) 0 14%,transparent 26%),radial-gradient(ellipse 110% 80% at 50% 10%,#43181e,#0b0305 72%)',
+      '--cell-empty': '#692735',
+      '--cell-neutral': '#853143',
+      '--cell-line': '#9e3b50'
+    }
+  },
+  {
+    id: 'amethist',
+    naam: 'Amethist',
+    beschrijving: 'Paars met een zilveren lijst.',
+    vars: {
+      '--card-bg': 'linear-gradient(165deg,#4a1f6b,#25103a)',
+      '--card-red': '#ff9ec2',
+      '--card-black': '#e8e4f4',
+      '--card-radius': '6px',
+      '--card-shadow': '0 2px 7px rgba(0,0,0,.7)',
+      '--card-frame': 'inset 0 0 0 1px rgba(206,212,230,.85), inset 0 0 0 3px rgba(255,255,255,.08)',
+      '--card-font': 'Georgia, serif',
+      '--card-back': 'repeating-linear-gradient(60deg,rgba(206,212,230,.25) 0 1px,transparent 1px 7px),linear-gradient(150deg,#59268a,#1c0c2c)',
+      '--felt': '#3b1a58',
+      '--felt-dark': '#150920',
+      '--table-bg': 'repeating-conic-gradient(from 30deg at 50% 50%,rgba(206,212,230,.05) 0deg 8deg,transparent 8deg 20deg),radial-gradient(ellipse at top,#432063,#120718 74%)',
+      '--cell-empty': '#622b93',
+      '--cell-neutral': '#7835b4',
+      '--cell-line': '#8a43c8'
+    }
+  },
+  {
+    id: 'kristal',
+    naam: 'Kristal',
+    beschrijving: 'Geslepen glas met scherpe hoeken.',
+    vars: {
+      '--card-bg': 'linear-gradient(135deg,rgba(255,255,255,.10),rgba(255,255,255,0) 25%),conic-gradient(from 45deg at 50% 50%,#2a2358,#332a6e,#151230,#2b2360,#2a2358)',
+      '--card-red': '#ffa6c4',
+      '--card-black': '#f4f0ff',
+      '--card-radius': '2px',
+      '--card-shadow': '0 3px 10px rgba(60,40,140,.6)',
+      '--card-frame': 'inset 0 0 0 1px rgba(255,255,255,.6)',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'conic-gradient(from 30deg at 50% 50%,#2b2560,#6c5fc0,#1d1845,#8878e8,#2b2560)',
+      '--felt': '#241f4e',
+      '--felt-dark': '#0b0920',
+      '--table-bg': 'conic-gradient(from 0deg at 50% 100%,transparent 0 165deg,rgba(180,160,255,.55) 165deg 195deg,transparent 195deg) 0 0/38px 74px repeat-x,conic-gradient(from 0deg at 50% 100%,transparent 0 168deg,rgba(120,100,210,.7) 168deg 192deg,transparent 192deg) 19px 0/54px 104px repeat-x,conic-gradient(from 0deg at 50% 0%,transparent 0 160deg,rgba(150,130,240,.65) 160deg 200deg,transparent 200deg) 0 100%/44px 86px repeat-x,conic-gradient(from 0deg at 50% 0%,transparent 0 160deg,rgba(90,72,180,.85) 160deg 200deg,transparent 200deg) 22px 100%/64px 120px repeat-x,radial-gradient(ellipse 40% 30% at 50% 55%,rgba(180,160,255,.30),transparent 70%),radial-gradient(ellipse 120% 90% at 50% 50%,#2b2458,#0a0818 72%)',
+      '--cell-empty': '#40378c',
+      '--cell-neutral': '#5044ae',
+      '--cell-line': '#5f55bc'
+    }
+  },
+  {
+    id: 'marine',
+    naam: 'Nachtblauw Klassiek',
+    beschrijving: 'Marine met crème inkt.',
+    vars: {
+      '--card-bg': 'linear-gradient(180deg,#1d2f52,#101c33)',
+      '--card-red': '#f08a8a',
+      '--card-black': '#f4efe3',
+      '--card-radius': '5px',
+      '--card-shadow': '0 2px 5px rgba(0,0,0,.6)',
+      '--card-frame': 'inset 0 0 0 1px rgba(244,239,227,.55), inset 0 0 0 3px rgba(244,239,227,.12)',
+      '--card-font': "'Iowan Old Style',Georgia,serif",
+      '--card-back': 'repeating-linear-gradient(45deg,rgba(244,239,227,.2) 0 1px,transparent 1px 6px),repeating-linear-gradient(-45deg,rgba(244,239,227,.2) 0 1px,transparent 1px 6px),#16243f',
+      '--felt': '#24365c',
+      '--felt-dark': '#0b1424',
+      '--cell-empty': '#36528b',
+      '--cell-neutral': '#4163a7',
+      '--cell-line': '#4f72ba'
+    }
+  },
+  {
+    id: 'diepzee',
+    naam: 'Diepzee',
+    beschrijving: 'Inktblauw met turkoois randlicht.',
+    vars: {
+      '--card-bg': 'radial-gradient(80% 70% at 50% 0%,#12405e,#04121f)',
+      '--card-red': '#ff8b93',
+      '--card-black': '#c8f2f6',
+      '--card-radius': '6px',
+      '--card-shadow': '0 2px 7px rgba(0,0,0,.7)',
+      '--card-frame': 'inset 0 0 0 1px rgba(64,200,208,.6), inset 0 0 9px rgba(64,200,208,.2)',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'repeating-radial-gradient(circle at 50% 50%,rgba(64,200,208,.22) 0 1px,transparent 1px 5px),linear-gradient(180deg,#0d3348,#04121f)',
+      '--felt': '#0f3d55',
+      '--felt-dark': '#03101a',
+      '--table-bg': 'radial-gradient(circle at 20% 70%,rgba(190,240,255,.5) 0 1.6px,transparent 2.4px) 0 0/64px 82px,radial-gradient(circle at 72% 40%,rgba(190,240,255,.35) 0 2.4px,transparent 3.4px) 0 0/120px 140px,linear-gradient(172deg,transparent 45%,rgba(150,235,255,.16) 47%,transparent 52%),linear-gradient(190deg,transparent 40%,rgba(150,235,255,.12) 43%,transparent 49%),conic-gradient(from 0deg at 50% 100%,transparent 0 168deg,#04121f 168deg 192deg,transparent 192deg) 0 100%/90px 60px repeat-x,linear-gradient(0deg,#03101a 0 12%,transparent 12%),linear-gradient(180deg,#1a6f8c,#062033 55%,#010810)',
+      '--cell-empty': '#165b7e',
+      '--cell-neutral': '#1a6d96',
+      '--cell-line': '#1e7eae'
+    }
+  },
+  {
+    id: 'blauwdruk',
+    naam: 'Blauwdruk',
+    beschrijving: 'Technisch raster op ingenieursblauw.',
+    vars: {
+      '--card-bg': 'repeating-linear-gradient(0deg,rgba(255,255,255,.16) 0 1px,transparent 1px 5px),repeating-linear-gradient(90deg,rgba(255,255,255,.16) 0 1px,transparent 1px 5px),#12365e',
+      '--card-red': '#ffb3b3',
+      '--card-black': '#ffffff',
+      '--card-radius': '2px',
+      '--card-shadow': '0 2px 5px rgba(0,0,0,.6)',
+      '--card-frame': 'inset 0 0 0 1px rgba(255,255,255,.55)',
+      '--card-font': "'Courier New',monospace",
+      '--card-back': 'repeating-linear-gradient(0deg,rgba(255,255,255,.3) 0 1px,transparent 1px 4px),repeating-linear-gradient(90deg,rgba(255,255,255,.3) 0 1px,transparent 1px 4px),#0d2745',
+      '--felt': '#123a63',
+      '--felt-dark': '#071a2e',
+      '--table-bg': 'repeating-linear-gradient(0deg,rgba(255,255,255,.10) 0 1px,transparent 1px 12px),repeating-linear-gradient(90deg,rgba(255,255,255,.10) 0 1px,transparent 1px 12px),repeating-linear-gradient(0deg,rgba(255,255,255,.18) 0 1px,transparent 1px 60px),repeating-linear-gradient(90deg,rgba(255,255,255,.18) 0 1px,transparent 1px 60px),linear-gradient(180deg,#154278,#06172a)',
+      '--cell-empty': '#1b5794',
+      '--cell-neutral': '#2068b1',
+      '--cell-line': '#2578cb'
+    }
+  },
+  {
+    id: 'neon',
+    naam: 'Neon Arcade',
+    beschrijving: 'Nachtblauw met cyaan en magenta gloed.',
+    vars: {
+      '--card-bg': 'linear-gradient(180deg,#141a2e,#080b16)',
+      '--card-red': '#ff4d8d',
+      '--card-black': '#46f0ff',
+      '--card-radius': '4px',
+      '--card-shadow': '0 0 10px rgba(70,240,255,.35), 0 2px 5px rgba(0,0,0,.7)',
+      '--card-frame': 'inset 0 0 0 1px rgba(70,240,255,.8), inset 0 0 0 3px rgba(255,77,141,.35)',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'repeating-linear-gradient(0deg,rgba(70,240,255,.18) 0 1px,transparent 1px 6px),repeating-linear-gradient(90deg,rgba(255,77,141,.18) 0 1px,transparent 1px 6px),#0a0f1c',
+      '--felt': '#171f38',
+      '--felt-dark': '#070a14',
+      '--table-bg': 'repeating-conic-gradient(from 200deg at 50% 26%,rgba(70,240,255,.16) 0 0.6deg,transparent 0.6deg 7deg),repeating-linear-gradient(0deg,rgba(255,77,141,.16) 0 1px,transparent 1px 14px) 0 60%/100% 40%,linear-gradient(0deg,#0a0f1c 0 34%,transparent 34%) 0 100%/100% 100% no-repeat,repeating-linear-gradient(90deg,transparent 0 12px,#12182c 12px 46px,#0a0f1c 46px 52px,transparent 52px 64px) 0 62%/100% 26px,repeating-linear-gradient(90deg,transparent 0 16px,rgba(70,240,255,.55) 16px 18px,transparent 18px 42px,rgba(255,77,141,.5) 42px 44px,transparent 44px 64px) 0 62%/100% 26px,radial-gradient(ellipse 60% 26% at 50% 66%,rgba(255,77,141,.35),transparent 70%),radial-gradient(ellipse 80% 40% at 50% 0%,rgba(70,240,255,.20),transparent 70%),linear-gradient(180deg,#1a2340,#05070f 78%)',
+      '--cell-empty': '#2d3d6d',
+      '--cell-neutral': '#384d89',
+      '--cell-line': '#435ba2'
+    }
+  },
+  {
+    id: 'mos',
+    naam: 'Mos',
+    beschrijving: 'Gedempt olijfgroen, papierachtig.',
+    vars: {
+      '--card-bg': 'repeating-linear-gradient(45deg,rgba(40,60,30,.06) 0 2px,transparent 2px 5px),linear-gradient(180deg,#c9cfa6,#aeb689)',
+      '--card-red': '#8c2117',
+      '--card-black': '#232a16',
+      '--card-radius': '5px',
+      '--card-shadow': '0 2px 5px rgba(0,0,0,.5)',
+      '--card-frame': 'inset 0 0 0 1px rgba(50,70,35,.5)',
+      '--card-font': 'Georgia, serif',
+      '--card-back': 'repeating-linear-gradient(45deg,rgba(201,207,166,.3) 0 1px,transparent 1px 6px),linear-gradient(160deg,#4d5c33,#28311a)',
+      '--felt': '#42502c',
+      '--felt-dark': '#161c0f',
+      '--table-bg': 'linear-gradient(178deg,transparent 40%,rgba(220,240,170,.14) 44%,transparent 52%),linear-gradient(186deg,transparent 34%,rgba(220,240,170,.10) 39%,transparent 47%),repeating-linear-gradient(90deg,transparent 0 46px,#2b3520 46px 60px,#212a18 60px 64px,transparent 64px 120px),conic-gradient(from 0deg at 50% 0%,transparent 0 168deg,rgba(60,84,38,.9) 168deg 192deg,transparent 192deg) 0 100%/26px 34px repeat-x,radial-gradient(circle at 30% 22%,rgba(150,190,90,.20) 0 4px,transparent 6px) 0 0/54px 62px,radial-gradient(ellipse 110% 90% at 50% 0%,#4b5c33,#10160b 76%)',
+      '--cell-empty': '#5b6f3d',
+      '--cell-neutral': '#6b8247',
+      '--cell-line': '#799451'
+    }
+  },
+  {
+    id: 'smaragd',
+    naam: 'Smaragd Foil',
+    beschrijving: 'Donkergroene kaart met een gouden randje.',
+    vars: {
+      '--card-bg': 'radial-gradient(90% 80% at 50% 10%,#14503c,#0a2c22)',
+      '--card-red': '#ff8d7a',
+      '--card-black': '#f0e4bf',
+      '--card-radius': '7px',
+      '--card-shadow': '0 2px 6px rgba(0,0,0,.7)',
+      '--card-frame': 'inset 0 0 0 1px rgba(190,159,65,.85), inset 0 0 0 4px rgba(0,0,0,.25)',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'repeating-conic-gradient(from 0deg at 50% 50%,rgba(190,159,65,.22) 0deg 6deg,transparent 6deg 14deg),radial-gradient(circle at 50% 50%,#16543f,#061a14)',
+      '--felt': '#0b3d2e',
+      '--felt-dark': '#082a20',
+      '--cell-empty': '#115d46',
+      '--cell-neutral': '#147054',
+      '--cell-line': '#188261'
+    }
+  },
+  {
+    id: 'circuit',
+    naam: 'Circuit',
+    beschrijving: 'Printplaatgroen met gouden sporen.',
+    vars: {
+      '--card-bg': 'repeating-linear-gradient(90deg,rgba(214,182,74,.22) 0 1px,transparent 1px 7px),repeating-linear-gradient(0deg,rgba(214,182,74,.22) 0 1px,transparent 1px 7px),linear-gradient(180deg,#0f3626,#08251a)',
+      '--card-red': '#ff8f6b',
+      '--card-black': '#ecdaa4',
+      '--card-radius': '3px',
+      '--card-shadow': '0 2px 6px rgba(0,0,0,.65)',
+      '--card-frame': 'inset 0 0 0 1px rgba(214,182,74,.6)',
+      '--card-font': "'Courier New',monospace",
+      '--card-back': 'repeating-linear-gradient(90deg,rgba(214,182,74,.35) 0 1px,transparent 1px 5px),repeating-linear-gradient(0deg,rgba(214,182,74,.35) 0 1px,transparent 1px 5px),#0a2c1e',
+      '--felt': '#14402d',
+      '--felt-dark': '#061a12',
+      '--table-bg': 'repeating-linear-gradient(90deg,transparent 0 10px,rgba(214,182,74,.75) 10px 13px,transparent 13px 34px) 0 30%/100% 4px no-repeat,repeating-linear-gradient(90deg,transparent 0 22px,rgba(120,255,190,.7) 22px 25px,transparent 25px 34px) 0 44%/100% 4px no-repeat,repeating-linear-gradient(90deg,transparent 0 6px,#0c2c1f 6px 44px,#071a12 44px 50px,transparent 50px 56px) 0 22%/100% 46%,repeating-conic-gradient(from 200deg at 50% 22%,rgba(214,182,74,.10) 0 0.8deg,transparent 0.8deg 9deg) 0 60%/100% 40%,radial-gradient(ellipse 80% 30% at 50% 100%,rgba(214,182,74,.22),transparent 72%),linear-gradient(180deg,#123c2a,#04120c 78%)',
+      '--cell-empty': '#1e6043',
+      '--cell-neutral': '#247350',
+      '--cell-line': '#29855c'
+    }
+  },
+  {
+    id: 'giftig',
+    naam: 'Giftig',
+    beschrijving: 'Zuurgroen op zwart.',
+    vars: {
+      '--card-bg': 'radial-gradient(70% 60% at 50% 100%,#1d3d0c,#0b0f07)',
+      '--card-red': '#ff6f8a',
+      '--card-black': '#a8ff3c',
+      '--card-radius': '4px',
+      '--card-shadow': '0 0 9px rgba(160,255,60,.3), 0 2px 5px rgba(0,0,0,.7)',
+      '--card-frame': 'inset 0 0 0 1px rgba(160,255,60,.75)',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'repeating-linear-gradient(45deg,#a8ff3c 0 3px,#0b0f07 3px 8px)',
+      '--felt': '#1f2b12',
+      '--felt-dark': '#080c05',
+      '--table-bg': 'conic-gradient(from 0deg at 50% 100%,transparent 0 172deg,rgba(168,255,60,.55) 172deg 188deg,transparent 188deg) 0 0/34px 46px repeat-x,radial-gradient(circle at 50% 0%,rgba(168,255,60,.7) 0 3px,transparent 4px) 17px 44px/68px 60px repeat-x,repeating-linear-gradient(90deg,transparent 0 14px,#1a2410 14px 40px,#0f1508 40px 44px,transparent 44px 66px) 0 100%/100% 44px no-repeat,repeating-linear-gradient(90deg,transparent 0 20px,rgba(168,255,60,.65) 20px 34px,transparent 34px 66px) 0 76%/100% 5px no-repeat,radial-gradient(ellipse 70% 26% at 50% 100%,rgba(168,255,60,.35),transparent 72%),radial-gradient(ellipse 110% 80% at 50% 20%,#243312,#050803 74%)',
+      '--cell-empty': '#364c20',
+      '--cell-neutral': '#435e27',
+      '--cell-line': '#4e6e2e'
+    }
+  },
+  {
+    id: 'staal',
+    naam: 'Staal',
+    beschrijving: 'Geborsteld metaal, industrieel.',
+    vars: {
+      '--card-bg': 'repeating-linear-gradient(90deg,rgba(255,255,255,.28) 0 1px,rgba(0,0,0,.06) 1px 3px),linear-gradient(180deg,#b9c0c7,#8e969e)',
+      '--card-red': '#9e1420',
+      '--card-black': '#191d21',
+      '--card-radius': '3px',
+      '--card-shadow': '0 2px 6px rgba(0,0,0,.6)',
+      '--card-frame': 'inset 0 0 0 1px rgba(40,48,56,.6)',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'repeating-linear-gradient(90deg,rgba(255,255,255,.14) 0 1px,transparent 1px 4px),linear-gradient(180deg,#4a525a,#262b30)',
+      '--felt': '#39424b',
+      '--felt-dark': '#151a1f',
+      '--table-bg': 'repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,transparent 1px 5px),radial-gradient(circle at 12% 12%,rgba(255,255,255,.12) 0 2px,transparent 3px) 0 0/64px 64px,radial-gradient(ellipse at top,#39424b,#12171c 72%)',
+      '--cell-empty': '#525f6b',
+      '--cell-neutral': '#61717f',
+      '--cell-line': '#6f8191'
+    }
+  },
+  {
+    id: 'krijt',
+    naam: 'Krijt',
+    beschrijving: 'Leisteen met krijtwitte symbolen.',
+    vars: {
+      '--card-bg': 'linear-gradient(180deg,#31373b,#232829)',
+      '--card-red': '#f08a80',
+      '--card-black': '#eef0ec',
+      '--card-radius': '3px',
+      '--card-shadow': '0 1px 3px rgba(0,0,0,.6)',
+      '--card-frame': 'inset 0 0 0 1px rgba(238,240,236,.2)',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'repeating-linear-gradient(45deg,rgba(238,240,236,.13) 0 1px,transparent 1px 5px),repeating-linear-gradient(-45deg,rgba(238,240,236,.13) 0 1px,transparent 1px 5px),#282d2f',
+      '--felt': '#2f3538',
+      '--felt-dark': '#14181a',
+      '--table-bg': 'repeating-linear-gradient(96deg,rgba(238,240,236,.05) 0 2px,transparent 2px 40px),radial-gradient(ellipse at top,#333a3d,#101314 74%)',
+      '--cell-empty': '#485256',
+      '--cell-neutral': '#576368',
+      '--cell-line': '#657378'
+    }
+  },
+  {
+    id: 'barok',
+    naam: 'Barok',
+    beschrijving: 'Zwart met gouden stralen en een drievoudige rand.',
+    vars: {
+      '--card-bg': 'repeating-conic-gradient(from 0deg at 50% 50%,rgba(190,159,65,.16) 0deg 3deg,transparent 3deg 9deg),radial-gradient(circle at 50% 40%,#22201a,#0a0908)',
+      '--card-red': '#ff7a6a',
+      '--card-black': '#f0d68a',
+      '--card-radius': '3px',
+      '--card-shadow': '0 3px 9px rgba(0,0,0,.8)',
+      '--card-frame': 'inset 0 0 0 1px #be9f41, inset 0 0 0 2px #0a0908, inset 0 0 0 3px rgba(190,159,65,.5)',
+      '--card-font': "'Iowan Old Style',Georgia,serif",
+      '--card-back': 'repeating-conic-gradient(from 0deg at 50% 50%,#be9f41 0deg 2deg,#0a0908 2deg 8deg)',
+      '--felt': '#221f16',
+      '--felt-dark': '#0a0906',
+      '--table-bg': 'repeating-conic-gradient(from 0deg at 50% 50%,rgba(190,159,65,.06) 0deg 2deg,transparent 2deg 7deg),radial-gradient(circle at 50% 45%,rgba(190,159,65,.14) 0 38%,transparent 62%),radial-gradient(ellipse at top,#241f14,#070604 72%)',
+      '--cell-empty': '#453e2c',
+      '--cell-neutral': '#574f38',
+      '--cell-line': '#675d42'
+    }
+  },
+  {
+    id: 'obsidiaan',
+    naam: 'Obsidiaan Foil',
+    beschrijving: 'Zwart glas met regenboogglans.',
+    vars: {
+      '--card-bg': 'linear-gradient(135deg,rgba(120,200,255,.22),rgba(255,120,220,.18) 40%,rgba(255,220,120,.14) 70%,transparent),#0c0c10',
+      '--card-red': '#ff7d9c',
+      '--card-black': '#eaf0ff',
+      '--card-radius': '6px',
+      '--card-shadow': '0 3px 8px rgba(0,0,0,.8)',
+      '--card-frame': 'inset 0 0 0 1px rgba(200,220,255,.4)',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'conic-gradient(from 140deg at 40% 30%,rgba(120,200,255,.4),rgba(255,120,220,.35),rgba(255,220,120,.3),rgba(120,200,255,.4)),#0c0c10',
+      '--felt': '#1b1b24',
+      '--felt-dark': '#08080c',
+      '--table-bg': 'linear-gradient(24deg,transparent 49.6%,rgba(200,225,255,.30) 50%,transparent 50.4%),linear-gradient(-38deg,transparent 39.6%,rgba(255,170,225,.22) 40%,transparent 40.4%),linear-gradient(72deg,transparent 63.6%,rgba(255,225,170,.18) 64%,transparent 64.4%),conic-gradient(from 200deg at 68% 12%,rgba(120,200,255,.20),rgba(255,120,220,.16),rgba(255,220,120,.12),rgba(120,200,255,.20)),conic-gradient(from 12deg at 18% 118%,#16161f 0 34deg,#0a0a11 34deg 62deg,#12121b 62deg 96deg,#07070c 96deg 128deg,#101019 128deg 168deg,#0b0b12 168deg 360deg)',
+      '--cell-empty': '#3b3b4e',
+      '--cell-neutral': '#4b4b64',
+      '--cell-line': '#5a5a76'
+    }
+  },
+  {
+    id: 'roet',
+    naam: 'Roetzwart',
+    beschrijving: 'Mat zwart, alleen typografie.',
+    vars: {
+      '--card-bg': '#141414',
+      '--card-red': '#ff5b5b',
+      '--card-black': '#fafafa',
+      '--card-radius': '9px',
+      '--card-shadow': '0 3px 7px rgba(0,0,0,.75)',
+      '--card-frame': 'none',
+      '--card-font': "'Trebuchet MS',Helvetica,sans-serif",
+      '--card-back': 'radial-gradient(circle at 50% 50%,rgba(250,250,250,.16) 0 1px,transparent 1.5px) 0 0/7px 7px,#141414',
+      '--felt': '#2a2a2a',
+      '--felt-dark': '#0d0d0d',
+      '--cell-empty': '#484848',
+      '--cell-neutral': '#595959',
+      '--cell-line': '#686868'
     }
   }
 ];
@@ -658,7 +1298,13 @@ const SKIN_DEFAULTS = {
   '--card-shadow': '0 1px 3px rgba(0,0,0,.6)',
   '--card-frame': 'none',
   '--card-font': 'inherit',
-  '--card-back': 'repeating-linear-gradient(135deg, #082a20, #082a20 3px, #10493a 3px, #10493a 6px)'
+  '--card-back': 'repeating-linear-gradient(135deg, #082a20, #082a20 3px, #10493a 3px, #10493a 6px)',
+  '--felt': '#0b3d2e',
+  '--felt-dark': '#082a20',
+  '--table-bg': 'radial-gradient(ellipse at top, var(--felt) 0%, var(--felt-dark) 70%)',
+  '--cell-empty': '#124a37',
+  '--cell-neutral': '#1c5c46',
+  '--cell-line': '#2f6b53'
 };
 
 function skinById(id){ return CARD_SKINS.find(s => s.id === id) || CARD_SKINS[0]; }
