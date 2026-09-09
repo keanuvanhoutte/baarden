@@ -110,6 +110,42 @@
   }
   .subpanel-terug:active{ opacity:1; }
 
+  /* Schuifknop voor de rustige tafel. De <input> zelf is onzichtbaar maar blijft in de tab-volgorde
+     staan, zodat toetsenbord en voorleessoftware er gewoon bij kunnen; .schuif tekent wat je ziet. */
+  .tafel-schakelaar{
+    display:flex; align-items:flex-start; gap:12px; width:100%;
+    margin:10px 0 0 0; padding:10px;
+    background:rgba(0,0,0,.18); border:1px solid var(--line); border-radius:10px;
+    cursor:pointer; user-select:none; touch-action:manipulation;
+  }
+  .tafel-schakelaar input{
+    position:absolute; opacity:0; width:0; height:0; margin:0;
+  }
+  .schuif{
+    flex-shrink:0; position:relative; width:42px; height:24px; margin-top:1px;
+    background:rgba(0,0,0,.45); border:1px solid rgba(242,234,217,.22); border-radius:999px;
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.5);
+    transition:background .18s ease, border-color .18s ease;
+  }
+  .schuif::after{
+    content:''; position:absolute; left:2px; top:2px; width:18px; height:18px;
+    background:var(--cream); border-radius:50%; opacity:.55;
+    box-shadow:0 1px 2px rgba(0,0,0,.5);
+    transition:transform .18s ease, background .18s ease, opacity .18s ease;
+  }
+  .tafel-schakelaar input:checked + .schuif{
+    background:linear-gradient(180deg, #d3b45e, var(--gold));
+    border-color:var(--gold); box-shadow:inset 0 1px 2px rgba(255,255,255,.25);
+  }
+  .tafel-schakelaar input:checked + .schuif::after{
+    transform:translateX(18px); background:var(--felt-dark); opacity:1;
+    box-shadow:0 1px 2px rgba(0,0,0,.45);
+  }
+  .tafel-schakelaar input:focus-visible + .schuif{ outline:2px solid var(--gold); outline-offset:2px; }
+  .schakelaar-tekst{ min-width:0; }
+  .schakelaar-naam{ display:block; font-weight:bold; color:var(--gold); font-size:14px; }
+  .schakelaar-uitleg{ display:block; font-size:11px; opacity:.75; margin-top:2px; }
+
   /* Keuzelijst met kaartdesigns. Elke rij zet de variabelen van zijn eigen design, zodat de
      voorbeeldkaartjes tonen waar je op klikt zonder dat je hoeft te kiezen om het te zien. */
   .skin-rij{
@@ -457,6 +493,14 @@
       Alleen jouw scherm verandert. Je tegenstander houdt zijn eigen design en het spel blijft
       exact hetzelfde.
     </div>
+    <label class="tafel-schakelaar" for="rustigeTafel">
+      <input type="checkbox" id="rustigeTafel" onchange="zetRustigeTafel(this.checked)">
+      <span class="schuif" aria-hidden="true"></span>
+      <span class="schakelaar-tekst">
+        <span class="schakelaar-naam">Rustige achtergrond</span>
+        <span class="schakelaar-uitleg">Een kalme tafel in de kleur van je design, in plaats van de scène erachter.</span>
+      </span>
+    </label>
     <div id="skinLijst"></div>
   </div>
 
@@ -654,12 +698,14 @@ const storageKey = () => 'baarden:'+roomCode;
 const CARD_SKINS = [
   {
     id: 'klassiek',
+    familie: 'u1',
     naam: 'Klassiek',
     beschrijving: 'Het originele kaartje op crèmekleurig karton.',
     vars: {}
   },
   {
     id: 'perkament',
+    familie: 'u8',
     naam: 'Perkament',
     beschrijving: 'Warm karton met een gestempelde rand.',
     vars: {
@@ -681,6 +727,7 @@ const CARD_SKINS = [
   },
   {
     id: 'ivoor',
+    familie: 'u8',
     naam: 'Ivoor',
     beschrijving: 'Bot-wit met een dunne dubbele lijst.',
     vars: {
@@ -701,6 +748,7 @@ const CARD_SKINS = [
   },
   {
     id: 'poster',
+    familie: 'u8',
     naam: 'Vintage Poster',
     beschrijving: 'Verschoten crème met een rode dubbelrand.',
     vars: {
@@ -722,6 +770,7 @@ const CARD_SKINS = [
   },
   {
     id: 'verschroeid',
+    familie: 'u5',
     naam: 'Perkament Verbrand',
     beschrijving: 'Crème met verschroeide randen.',
     vars: {
@@ -743,6 +792,7 @@ const CARD_SKINS = [
   },
   {
     id: 'sneeuw',
+    familie: 'u7',
     naam: 'Sneeuw',
     beschrijving: 'Koel wit kaartje met een haarfijne rand.',
     vars: {
@@ -764,6 +814,7 @@ const CARD_SKINS = [
   },
   {
     id: 'vuurtoren',
+    familie: 'u6',
     naam: 'Vuurtoren',
     beschrijving: 'Wit blad met een rood-wit gestreepte rug.',
     vars: {
@@ -785,6 +836,7 @@ const CARD_SKINS = [
   },
   {
     id: 'marmer',
+    familie: 'u3',
     naam: 'Roze Marmer',
     beschrijving: 'Geaderde steen, koelwit.',
     vars: {
@@ -806,6 +858,7 @@ const CARD_SKINS = [
   },
   {
     id: 'bloesem',
+    familie: 'u3',
     naam: 'Kersenbloesem',
     beschrijving: 'Zacht roze met een witte rand.',
     vars: {
@@ -827,6 +880,7 @@ const CARD_SKINS = [
   },
   {
     id: 'holo',
+    familie: 'u4',
     naam: 'Holografisch',
     beschrijving: 'Pastelfolie die van hoek verschiet.',
     vars: {
@@ -848,6 +902,7 @@ const CARD_SKINS = [
   },
   {
     id: 'bladgoud',
+    familie: 'u5',
     naam: 'Bladgoud',
     beschrijving: 'Geslagen goudfolie met donkere inkt.',
     vars: {
@@ -869,6 +924,7 @@ const CARD_SKINS = [
   },
   {
     id: 'zonnewijzer',
+    familie: 'u5',
     naam: 'Zonnewijzer',
     beschrijving: 'Okergeel met bruine inkt.',
     vars: {
@@ -890,6 +946,7 @@ const CARD_SKINS = [
   },
   {
     id: 'terracotta',
+    familie: 'u5',
     naam: 'Terracotta',
     beschrijving: 'Gebakken klei met een warme rand.',
     vars: {
@@ -910,6 +967,7 @@ const CARD_SKINS = [
   },
   {
     id: 'koper',
+    familie: 'u9',
     naam: 'Koper',
     beschrijving: 'Geoxideerd metaal met groene aanslag.',
     vars: {
@@ -931,6 +989,7 @@ const CARD_SKINS = [
   },
   {
     id: 'magma',
+    familie: 'u5',
     naam: 'Magma',
     beschrijving: 'Zwart basalt met een gloeiende onderrand.',
     vars: {
@@ -952,6 +1011,7 @@ const CARD_SKINS = [
   },
   {
     id: 'bloedmaan',
+    familie: 'u3',
     naam: 'Bloedmaan',
     beschrijving: 'Bordeaux kaart met gloed en een gouden rand.',
     vars: {
@@ -973,6 +1033,7 @@ const CARD_SKINS = [
   },
   {
     id: 'amethist',
+    familie: 'u4',
     naam: 'Amethist',
     beschrijving: 'Paars met een zilveren lijst.',
     vars: {
@@ -994,6 +1055,7 @@ const CARD_SKINS = [
   },
   {
     id: 'kristal',
+    familie: 'u4',
     naam: 'Kristal',
     beschrijving: 'Geslepen glas met scherpe hoeken.',
     vars: {
@@ -1015,6 +1077,7 @@ const CARD_SKINS = [
   },
   {
     id: 'marine',
+    familie: 'u2',
     naam: 'Nachtblauw Klassiek',
     beschrijving: 'Marine met crème inkt.',
     vars: {
@@ -1035,6 +1098,7 @@ const CARD_SKINS = [
   },
   {
     id: 'diepzee',
+    familie: 'u6',
     naam: 'Diepzee',
     beschrijving: 'Inktblauw met turkoois randlicht.',
     vars: {
@@ -1056,6 +1120,7 @@ const CARD_SKINS = [
   },
   {
     id: 'blauwdruk',
+    familie: 'u2',
     naam: 'Blauwdruk',
     beschrijving: 'Technisch raster op ingenieursblauw.',
     vars: {
@@ -1077,6 +1142,7 @@ const CARD_SKINS = [
   },
   {
     id: 'neon',
+    familie: 'u2',
     naam: 'Neon Arcade',
     beschrijving: 'Nachtblauw met cyaan en magenta gloed.',
     vars: {
@@ -1098,6 +1164,7 @@ const CARD_SKINS = [
   },
   {
     id: 'mos',
+    familie: 'u9',
     naam: 'Mos',
     beschrijving: 'Gedempt olijfgroen, papierachtig.',
     vars: {
@@ -1119,6 +1186,7 @@ const CARD_SKINS = [
   },
   {
     id: 'smaragd',
+    familie: 'u1',
     naam: 'Smaragd Foil',
     beschrijving: 'Donkergroene kaart met een gouden randje.',
     vars: {
@@ -1139,6 +1207,7 @@ const CARD_SKINS = [
   },
   {
     id: 'circuit',
+    familie: 'u1',
     naam: 'Circuit',
     beschrijving: 'Printplaatgroen met gouden sporen.',
     vars: {
@@ -1160,6 +1229,7 @@ const CARD_SKINS = [
   },
   {
     id: 'giftig',
+    familie: 'u9',
     naam: 'Giftig',
     beschrijving: 'Zuurgroen op zwart.',
     vars: {
@@ -1181,6 +1251,7 @@ const CARD_SKINS = [
   },
   {
     id: 'staal',
+    familie: 'u7',
     naam: 'Staal',
     beschrijving: 'Geborsteld metaal, industrieel.',
     vars: {
@@ -1202,6 +1273,7 @@ const CARD_SKINS = [
   },
   {
     id: 'krijt',
+    familie: 'u7',
     naam: 'Krijt',
     beschrijving: 'Leisteen met krijtwitte symbolen.',
     vars: {
@@ -1223,6 +1295,7 @@ const CARD_SKINS = [
   },
   {
     id: 'barok',
+    familie: 'u10',
     naam: 'Barok',
     beschrijving: 'Zwart met gouden stralen en een drievoudige rand.',
     vars: {
@@ -1244,6 +1317,7 @@ const CARD_SKINS = [
   },
   {
     id: 'obsidiaan',
+    familie: 'u10',
     naam: 'Obsidiaan Foil',
     beschrijving: 'Zwart glas met regenboogglans.',
     vars: {
@@ -1265,6 +1339,7 @@ const CARD_SKINS = [
   },
   {
     id: 'roet',
+    familie: 'u10',
     naam: 'Roetzwart',
     beschrijving: 'Mat zwart, alleen typografie.',
     vars: {
@@ -1284,6 +1359,45 @@ const CARD_SKINS = [
     }
   }
 ];
+
+/* De tien rustige tafels: één per kleurfamilie. Ze vervangen alleen --table-bg; de tafelkleur
+   (--felt) en dus ook de veldvakjes blijven van het design zelf, zodat het bord in de kleur van je
+   kaarten blijft staan op een kalme ondergrond. Elk design wijst met zijn 'familie' naar één
+   hiervan. */
+const RUSTIGE_TAFELS = {
+  u1: { naam: 'Laken groen', tableBg: 'repeating-linear-gradient(45deg,rgba(255,255,255,.035) 0 1px,transparent 1px 4px),repeating-linear-gradient(-45deg,rgba(0,0,0,.05) 0 1px,transparent 1px 4px),radial-gradient(ellipse 120% 100% at 50% 0%,#1c5240,#0d2b21 62%,#071711)' },
+  u2: { naam: 'Nachtblauw', tableBg: 'radial-gradient(ellipse 45% 40% at 22% 26%,rgba(130,180,240,.16),transparent 70%),radial-gradient(ellipse 55% 48% at 80% 74%,rgba(40,80,140,.28),transparent 72%),radial-gradient(ellipse 120% 100% at 50% 0%,#1b3f6b,#0d2340 60%,#060e1c)' },
+  u3: { naam: 'Wijnrood', tableBg: 'repeating-linear-gradient(60deg,rgba(255,225,230,.05) 0 12px,transparent 12px 24px),repeating-linear-gradient(-60deg,rgba(0,0,0,.06) 0 12px,transparent 12px 24px),radial-gradient(ellipse 120% 100% at 50% 0%,#5e2a34,#33161d 62%,#160709)' },
+  u4: { naam: 'Pruim paars', tableBg: 'repeating-linear-gradient(45deg,rgba(230,215,255,.07) 0 1px,transparent 1px 26px),repeating-linear-gradient(-45deg,rgba(230,215,255,.07) 0 1px,transparent 1px 26px),radial-gradient(ellipse 120% 100% at 50% 0%,#412f5c,#231734 62%,#0e0916)' },
+  u5: { naam: 'Honinggoud', tableBg: 'repeating-linear-gradient(90deg,rgba(255,225,160,.07) 0 1px,transparent 1px 7px),radial-gradient(ellipse 120% 100% at 50% 0%,#6d4a1c,#3b2710 60%,#1a1006)' },
+  u6: { naam: 'Diepwater teal', tableBg: 'repeating-radial-gradient(circle at 50% 50%,rgba(170,235,245,.06) 0 1px,transparent 1px 42px),radial-gradient(ellipse 120% 100% at 50% 0%,#12455e,#082a3b 60%,#031218)' },
+  u7: { naam: 'Steengrijs', tableBg: 'repeating-linear-gradient(0deg,rgba(255,255,255,.055) 0 1px,transparent 1px 20px),repeating-linear-gradient(90deg,rgba(255,255,255,.055) 0 1px,transparent 1px 20px),radial-gradient(ellipse 120% 100% at 50% 0%,#44505c,#242c34 62%,#101418)' },
+  u8: { naam: 'Linnen zand', tableBg: 'repeating-linear-gradient(90deg,rgba(255,245,225,.10) 0 1px,transparent 1px 3px),repeating-linear-gradient(0deg,rgba(60,40,20,.10) 0 1px,transparent 1px 3px),radial-gradient(ellipse 120% 100% at 50% 0%,#a38662,#8a6f52 30%,#4a3a28 78%,#2a2016)' },
+  u9: { naam: 'Salie olijf', tableBg: 'repeating-linear-gradient(45deg,rgba(228,242,192,.08) 0 1px,transparent 1px 9px) 0 0/18px 18px,repeating-linear-gradient(-45deg,rgba(228,242,192,.08) 0 1px,transparent 1px 9px) 9px 9px/18px 18px,radial-gradient(ellipse 120% 100% at 50% 0%,#4b5a32,#2b351c 62%,#141a0d)' },
+  u10: { naam: 'Antraciet', tableBg: 'repeating-linear-gradient(115deg,rgba(255,255,255,.05) 0 2px,transparent 2px 6px,rgba(255,255,255,.022) 6px 8px,transparent 8px 18px),radial-gradient(ellipse 120% 100% at 50% 0%,#262a33,#15181e 60%,#08090c)' }
+};
+
+const RUSTIG_OPSLAG = 'baarden:rustigetafel';
+
+// Zelfde opzet als de designkeuze: het geheugen is de waarheid, opslag onthoudt het alleen. Zie de
+// uitleg bij gekozenSkinId() waarom sessionStorage voorgaat op localStorage.
+let rustigInGeheugen = null;
+function rustigeTafelAan(){
+  if(rustigInGeheugen !== null) return rustigInGeheugen;
+  let uitOpslag = null;
+  try { uitOpslag = sessionStorage.getItem(RUSTIG_OPSLAG); } catch(e){}
+  if(uitOpslag === null){ try { uitOpslag = localStorage.getItem(RUSTIG_OPSLAG); } catch(e){} }
+  rustigInGeheugen = uitOpslag === '1';
+  return rustigInGeheugen;
+}
+
+function zetRustigeTafel(aan){
+  rustigInGeheugen = !!aan;
+  const waarde = aan ? '1' : '0';
+  try { sessionStorage.setItem(RUSTIG_OPSLAG, waarde); } catch(e){}
+  try { localStorage.setItem(RUSTIG_OPSLAG, waarde); } catch(e){}
+  pasSkinToe(gekozenSkinId());
+}
 
 const SKIN_OPSLAG = 'baarden:skin';
 
@@ -1333,10 +1447,15 @@ function gekozenSkinId(){
 }
 
 /** Zet de waarden van een design op de pagina. Alles wat een design niet noemt, wordt gewist zodat
- *  er geen resten van het vorige design blijven hangen. */
+ *  er geen resten van het vorige design blijven hangen. Staat de rustige tafel aan, dan gaat alleen
+ *  de achtergrond over op die van de kleurfamilie; de kaarten en het bord blijven ongemoeid. */
 function pasSkinToe(id){
   const root = document.documentElement;
-  Object.entries(skinVars(skinById(id))).forEach(([k,v]) => root.style.setProperty(k, v));
+  const skin = skinById(id);
+  const vars = skinVars(skin);
+  const rustig = rustigeTafelAan() && RUSTIGE_TAFELS[skin.familie];
+  if(rustig) vars['--table-bg'] = rustig.tableBg;
+  Object.entries(vars).forEach(([k,v]) => root.style.setProperty(k, v));
 }
 
 function kiesSkin(id){
@@ -1832,6 +1951,8 @@ function openMenuPanel(name){
 function renderSkinLijst(){
   const el = document.getElementById('skinLijst');
   if(!el) return;
+  const schakelaar = document.getElementById('rustigeTafel');
+  if(schakelaar) schakelaar.checked = rustigeTafelAan();
   const actief = gekozenSkinId();
   el.innerHTML = '';
 
