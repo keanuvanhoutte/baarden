@@ -1508,6 +1508,7 @@ function createInitialState(){
     board,
     hold:{ red:null, black:null },
     blockReserve:{ red:true, black:true },
+    blockMovedRound:{ red:0, black:0 }, // ronde waarin de blok-kaart voor het laatst (ver)legd is — houdt de AI ervan af hem te blijven verschuiven
     draw:{ red:buildColorDeck('red'), black:buildColorDeck('black') },
     discard:{ red:[], black:[] },
     fallen:{ red:[], black:[] }, // gesneuvelde (in gevecht vernietigde) kaarten — blijven hier permanent tot herleefd, nooit herschud
@@ -1553,6 +1554,10 @@ function hydrateState(s){
   if(!s.blockReserve) s.blockReserve = {red:true, black:true};
   if(typeof s.blockReserve.red === 'undefined') s.blockReserve.red = true;
   if(typeof s.blockReserve.black === 'undefined') s.blockReserve.black = true;
+
+  if(!s.blockMovedRound) s.blockMovedRound = {red:0, black:0};
+  if(typeof s.blockMovedRound.red === 'undefined') s.blockMovedRound.red = 0;
+  if(typeof s.blockMovedRound.black === 'undefined') s.blockMovedRound.black = 0;
 
   if(!s.draw) s.draw = {red:[], black:[]};
   if(!s.draw.red) s.draw.red = [];
@@ -2472,6 +2477,8 @@ async function placeBlockCard(cell){
   destStack.push({owner:color, kind:'block'});
   state.board[cell] = destStack;
   state.blockPlaceMode = false;
+  if(!state.blockMovedRound) state.blockMovedRound = {red:0, black:0};
+  state.blockMovedRound[color] = state.roundNumber;
   pushLog(`${label(color)} ${fromCell ? 'verlegt' : 'legt'} zijn blok-kaart naar ${cell} — de kaart(en) daaronder liggen nu geblokkeerd.`);
   await afterMove(color);
 }
@@ -2854,8 +2861,77 @@ function attemptMove(color, srcCell, destCell){
 let AI_WEIGHTS = { towerDiff:111.70481965674506, ownCardVal:0.05, oppCardVal:0.10356158334450093, ownAdvance:0.9995500917448126, oppThreat:0.1291231743405385, blockBonus:0.19230643261433683 }; // getraind via baarden-train.js
 const AI_SEARCH_DEPTH = 4; // aantal zetten (plies) vooruitkijken tijdens de bewegingsfase
 
+// Een geblokkeerde kaart telt nergens mee in de waardering (er wordt enkel naar de bovenste kaart
+// van een vakje gekeken). Daardoor was het verleggen van de blok-kaart bijna gratis: de AI raakte
+// het smoren niet kwijt, hij verhuisde het alleen — en gaf zo een kaart vrij die pal voor zijn
+// toren lag. Daarom staat er nu een zware straf op een VRIJE vijandelijke kaart die onze toren
+// raakt én in waarde verslaat: die wint het spel bij zijn volgende beurt. De straf verdwijnt zodra
+// die kaart onschadelijk is — of hij nu onder onze blok-kaart ligt, verslagen is, of onder een
+// eigen kaart bedolven raakt. Bewust een straf op de dreiging en geen bonus op het blokkeren:
+// anders zou de AI het wégslaan van die kaart als verlies zien en hem liever eeuwig blijven
+// blokkeren. Bewust ook een losse constante en geen AI_WEIGHTS-sleutel: het trainingsscript kent
+// de blok-kaart niet en zou ze bij een copy-paste van nieuwe gewichten wegvagen.
+const AI_LETHAL_THREAT_PENALTY = 90; // bijna een heel torenniveau (towerDiff), want dit ís verliezen
+
 function manhattan(a,b){
   return Math.abs(rowIndex(a)-rowIndex(b)) + Math.abs(colOf(a)-colOf(b));
+}
+
+// Verslaat deze kaart die andere in waarde? Inclusief de bevestigde 2-slaat-Aas-uitzondering.
+function beatsInValue(attacker, defender){
+  if(!attacker || !defender) return false;
+  if(attacker.rank==='2' && defender.rank==='A') return true;
+  return valueOf(attacker.rank) > valueOf(defender.rank);
+}
+
+// Is dit stuk op dit vakje een vijandelijke kaart die pal naast de toren van `color` ligt en die
+// toren in waarde verslaat? Het stuk hoeft niet bovenaan te liggen, zodat we ook kunnen vragen
+// wat er onder een blok-kaart zit.
+function isLethalTowerThreat(board, cell, piece, color){
+  if(!piece || piece.kind!=='normal' || piece.owner===color) return false;
+  const tCell = towerCellOf(color);
+  const tStack = board[tCell];
+  if(!tStack || !tStack.length) return false;
+  return neighbors(tCell).includes(cell) && beatsInValue(piece, tStack[tStack.length-1]);
+}
+
+// Ligt onder onze blok-kaart op dit vakje zo'n dodelijke kaart? Dan is die blok-kaart het enige
+// wat een verloren spel tegenhoudt.
+function smothersLethalThreat(board, cell, color){
+  const stack = board[cell];
+  if(!stack || stack.length<2) return false;
+  return isLethalTowerThreat(board, cell, stack[stack.length-2], color);
+}
+
+// Bevestigd, veelgebruikte truc om je blok-kaart terug vrij te krijgen: in een ronde waarin je als
+// TWEEDE beweegt, verleg je hem weg van de kaart die hij smoort. De starter wisselt elke ronde, dus
+// meteen daarna ben je als EERSTE opnieuw aan zet — de vrijgekomen kaart krijgt geen enkele beurt
+// en je verslaat hem (hogere waarde) of legt je erbovenop (gelijke waarde). Dat werkt zelfs als die
+// kaart pal voor je toren ligt. Geeft het vakje en de eigen kaart die de klus afmaakt, of null.
+function blockReleasePlan(board, color, phaseIndex){
+  if(phaseIndex!==1) return null; // enkel als de volgende beurt meteen weer van ons is
+  const cell = blockTopCellOf(board, color);
+  if(!cell) return null;
+  const stack = board[cell];
+  const buried = stack[stack.length-2];
+  if(!buried || buried.kind!=='normal' || buried.owner===color) return null;
+  const attacker = neighbors(cell).find(n=>{
+    const s = board[n];
+    if(!s || !s.length) return false;
+    const top = s[s.length-1];
+    if(top.owner!==color || top.kind!=='normal') return false;
+    return beatsInValue(top, buried) || valueOf(top.rank)===valueOf(buried.rank);
+  });
+  return attacker ? {cell, attacker} : null;
+}
+
+// Op welk vakje ligt de blok-kaart van deze kleur bovenaan? (null = nog naast het bord, of zelf
+// begraven onder een andere kaart) Bord-onafhankelijk, dus ook bruikbaar op AI-simulatieborden.
+function blockTopCellOf(board, color){
+  return ALL_CELLS.find(c=>{
+    const s = board[c];
+    return s && s.length && s[s.length-1].kind==='block' && s[s.length-1].owner===color;
+  }) || null;
 }
 
 // Heuristische bordwaardering vanuit het perspectief van forColor. Hoger = beter voor forColor.
@@ -2876,6 +2952,7 @@ function evalBoardHeuristic(board, forColor){
       } else {
         score -= val*AI_WEIGHTS.oppCardVal;
         score -= Math.max(0,6-manhattan(cell,towerCellOf(forColor)))*AI_WEIGHTS.oppThreat;
+        if(isLethalTowerThreat(board, cell, top, forColor)) score -= AI_LETHAL_THREAT_PENALTY;
       }
     } else if(top.kind==='block' && top.owner===forColor){
       score += AI_WEIGHTS.blockBonus;
@@ -2978,14 +3055,17 @@ function chooseBestMoveCautiously(board, maxColor, starter, phaseIndex){
     if(sim.winner===maxColor) score = 1e6;
     else if(sim.winner) score = -1e6;
     else score = minimaxSearch(sim.board, AI_SEARCH_DEPTH-1, maxColor, nextState.starter, nextState.phaseIndex, -Infinity, Infinity).score;
-    const entry = {mv, score};
+    // Veldnaam `move`, net als de lege uitkomsten hierboven en hieronder: aiDoMovePhase leest
+    // moveResult.move. Met `mv` was dat altijd leeg, waardoor de bot nooit een gewone kaart
+    // verschoof zolang zijn blok-kaart ergens heen kon — en die dus elke beurt verlegde.
+    const entry = {move: mv, score};
     if(!bestOverall || score>bestOverall.score) bestOverall = entry;
     if(!isWeakAttack && (!bestSafe || score>bestSafe.score)) bestSafe = entry;
   });
   if(!bestOverall) return {score:-Infinity, move:null};
   const overallWasWeakAttack = (()=>{
-    const wasOccupied = !!(board[bestOverall.mv.dest] && board[bestOverall.mv.dest].length);
-    const movingTop = board[bestOverall.mv.src][board[bestOverall.mv.src].length-1];
+    const wasOccupied = !!(board[bestOverall.move.dest] && board[bestOverall.move.dest].length);
+    const movingTop = board[bestOverall.move.src][board[bestOverall.move.src].length-1];
     return wasOccupied && valueOf(movingTop.rank) <= AI_WEAK_ATTACK_RANK_CAP;
   })();
   if(overallWasWeakAttack && bestSafe && (bestOverall.score - bestSafe.score) < AI_WEAK_ATTACK_MARGIN){
@@ -3009,11 +3089,7 @@ function getBlockTargetsOnBoard(board, color){
 
 function simulateBlockPlacement(board, color, target){
   const nb = JSON.parse(JSON.stringify(board));
-  let fromCell = null;
-  ALL_CELLS.forEach(c=>{
-    const s = nb[c];
-    if(s && s.length && s[s.length-1].kind==='block' && s[s.length-1].owner===color) fromCell = c;
-  });
+  const fromCell = blockTopCellOf(nb, color);
   if(fromCell){
     const s = nb[fromCell];
     s.pop();
@@ -3030,6 +3106,12 @@ function simulateBlockPlacement(board, color, target){
 // kijken we, net als bij een gewone zet, vooruit naar het beste antwoord van de tegenstander.
 function bestBlockOption(board, color, starter, phaseIndex){
   if(isBlockBuried(color)) return null;
+  const fromCell = blockTopCellOf(board, color);
+  const release = blockReleasePlan(board, color, phaseIndex);
+  // Ligt de blok-kaart op een kaart die onze toren pal bedreigt, dan is verleggen zelfmoord: die
+  // kaart komt vrij en verovert de toren. Enige uitzondering is de bevrijdings-truc, waarbij we
+  // meteen opnieuw aan zet zijn en die kaart wegslaan voor hij ook maar iets kan doen.
+  if(fromCell && smothersLethalThreat(board, fromCell, color) && !release) return null;
   const targets = getBlockTargetsOnBoard(board, color);
   if(targets.length===0) return null;
   const nextState = nextTurnState(starter, phaseIndex);
@@ -3039,7 +3121,29 @@ function bestBlockOption(board, color, starter, phaseIndex){
     const contScore = minimaxSearch(nb, Math.max(0,AI_SEARCH_DEPTH-1), color, nextState.starter, nextState.phaseIndex, -Infinity, Infinity).score;
     if(contScore > bestScore){ bestScore = contScore; best = target; }
   });
-  return best===null ? null : {target:best, score:bestScore};
+  if(best===null) return null;
+  // De zoekboom ziet het wegslaan van de vrijgekomen kaart al, maar niet wat een terug vrije
+  // blok-kaart waard is: die kan voortaan elders een dreiging smoren i.p.v. eeuwig op één kaart
+  // te liggen. Die winst aan speelruimte tellen we er hier bij.
+  if(release) bestScore += AI_BLOCK_RELEASE_BONUS;
+  return {target:best, score:bestScore, relocation: !!fromCell, release: !!release};
+}
+
+// Hoeveel beter dan de beste gewone zet moet een blok-zet zijn voordat de AI hem speelt?
+const AI_BLOCK_RELOCATE_MARGIN = 12;   // vereiste extra winst om een al liggende blok-kaart te verleggen
+const AI_BLOCK_RELOCATE_COOLDOWN = 3;  // ronden na een (ver)legging waarin een hogere drempel geldt
+const AI_BLOCK_COOLDOWN_MARGIN = AI_LETHAL_THREAT_PENALTY/2; // binnen die ronden: enkel om een kaart van onze toren weg te houden
+const AI_BLOCK_RELEASE_BONUS = 20;     // waarde van een blok-kaart die via de bevrijdings-truc terug vrij komt
+
+function blockRelocateThreshold(blockOption, color){
+  if(!blockOption.relocation) return 0; // eerste plaatsing: die mag gewoon op score winnen
+  if(blockOption.release) return 0;     // bevrijdings-truc: bewust gespeeld, dus geen rem en geen afkoelperiode
+  const laatsteRonde = (state.blockMovedRound && state.blockMovedRound[color]) || 0;
+  // Vlak na een (ver)legging blijft de blok-kaart liggen, tenzij verleggen een kaart tegenhoudt die
+  // op weg is naar onze toren (dat scheelt ongeveer de dodelijke-dreiging-straf). Daarna volstaat
+  // een duidelijke, maar haalbare marge.
+  if(state.roundNumber - laatsteRonde < AI_BLOCK_RELOCATE_COOLDOWN) return AI_BLOCK_COOLDOWN_MARGIN;
+  return AI_BLOCK_RELOCATE_MARGIN;
 }
 
 function isTowerThreatened(color){
@@ -3092,7 +3196,12 @@ async function aiDoMovePhase(){
 
   // Bevestigd: vergelijk de blok-kaart als volwaardig alternatief t.o.v. de beste gewone zet,
   // i.p.v. hem enkel als noodgreep te gebruiken wanneer er toevallig geen andere zet meer is.
-  if(blockOption && (!moveResult.move || blockOption.score > moveResult.score)){
+  // Voor een EERSTE plaatsing volstaat dat hij beter scoort. Voor een VERLEGGING niet: een blok
+  // die ergens goed ligt weer oppakken kost altijd iets (de kaart eronder komt vrij), dus dat mag
+  // enkel voor een duidelijke winst — anders bleef de bot zijn blok-kaart rondsjouwen en gaf hij
+  // een kaart vrij die het spel meteen kon beslissen. De bevrijdings-truc (als tweede bewegen,
+  // verleggen, en meteen daarna de vrijgekomen kaart wegslaan) valt buiten die rem.
+  if(blockOption && (!moveResult.move || blockOption.score > moveResult.score + blockRelocateThreshold(blockOption, color))){
     state.blockPlaceMode = true;
     await placeBlockCard(blockOption.target);
     return;
@@ -3128,15 +3237,75 @@ async function aiDoMovePhase(){
   await afterMove(color);
 }
 
+// Welke van meerdere even hoge kaarten gebruikt de AI om zijn toren op te waarderen? De waarde is
+// telkens dezelfde, het verschil zit in wat er achterblijft. Volgorde van voorkeur:
+//  1. Bevestigd: een kaart NAAST de toren gaat voor een kaart uit de hand;
+//  2. een kaart uit de hand;
+//  3. de hold-kaart, die blijft liever achter de hand liggen;
+//  4. als laatste een kaart naast de toren waaronder een vijandelijke kaart geblokkeerd ligt —
+//     die weghalen maakt een vijandelijke kaart pal naast je eigen toren weer los.
+// Binnen dezelfde soort beslist de bordwaardering na het opwaarderen.
+function aiPickTowerCandidate(color){
+  const soortRang = item=>{
+    if(item.source==='orthogonal') return state.board[item.cell].length>1 ? 3 : 0;
+    return item.source==='hand' ? 1 : 2;
+  };
+  let bestIdx = 0, best = null;
+  state.towerBuild.pendingCandidates.forEach((item, idx)=>{
+    const nb = JSON.parse(JSON.stringify(state.board));
+    if(item.source==='orthogonal'){
+      nb[item.cell].pop();
+      if(!nb[item.cell].length) nb[item.cell] = null;
+    }
+    nb[towerCellOf(color)].push({owner:color, kind:'towerlayer', rank:item.card.rank, suit:item.card.suit, id:item.card.id});
+    const kandidaat = {rang: soortRang(item), score: evalBoardHeuristic(nb, color)};
+    if(!best || kandidaat.rang < best.rang || (kandidaat.rang===best.rang && kandidaat.score > best.score)){
+      best = kandidaat; bestIdx = idx;
+    }
+  });
+  return bestIdx;
+}
+
+// Welke gesneuvelde kaart haalt de AI terug in zijn hold? De sterkste: een hoge kaart wint de meeste
+// gevechten, en niets kiezen levert nooit iets op (herleven kan enkel met een lege hold).
+function aiPickReviveCard(color){
+  const opties = state.reviveChoice.options;
+  if(!opties || !opties.length) return null;
+  return opties.reduce((a,b)=> valueOf(b.rank) > valueOf(a.rank) ? b : a).id;
+}
+
+// Toren-opbouw en herleven pauzeren om de speler te laten kiezen (meerdere kaarten met dezelfde
+// waarde, of welke gesneuvelde kaart terugkomt). Voor een mens is dat een klikmenu; de AI kende die
+// keuze niet, waardoor het menu openbleef en de tegenstander hem voor de bot moest maken. Een keuze
+// kan meteen een volgende openen (een Boer-reset midden in de opbouw), dus we blijven kiezen tot er
+// niets meer openstaat of de beurt voorbij is.
+async function aiResolvePendingChoices(){
+  const color = aiColor;
+  for(let stap=0; stap<20 && state && !state.winner && state.turn===color; stap++){
+    if(state.reviveChoice && state.reviveChoice.color===color){
+      await sleep(350);
+      await chooseRevive(aiPickReviveCard(color));
+    } else if(state.towerBuild && state.towerBuild.pendingCandidates){
+      await sleep(350);
+      await chooseTowerCandidate(aiPickTowerCandidate(color));
+    } else {
+      break;
+    }
+  }
+}
+
 async function aiTakeTurn(){
   if(!aiMode || aiThinking || !state || state.winner || state.turn!==aiColor) return;
   aiThinking = true;
   bypassTurnGate = true;
   try{
     await sleep(500); // korte "denkpauze" zodat de zet van de AI volgbaar blijft
-    if(state.phase==='draw'){ await doDrawBoth(); }
-    else if(state.phase==='place'){ await aiDoPlacePhase(); }
-    else if(state.phase==='move'){ await aiDoMovePhase(); }
+    // Staat er nog een keuze open (bv. na een herlaadbeurt midden in een opbouw), dan eerst die.
+    // Anders zou de fase-logica een nieuwe opbouw starten of een zet proberen die geweigerd wordt.
+    if(state.towerBuild || state.reviveChoice){ await aiResolvePendingChoices(); }
+    else if(state.phase==='draw'){ await doDrawBoth(); }
+    else if(state.phase==='place'){ await aiDoPlacePhase(); await aiResolvePendingChoices(); }
+    else if(state.phase==='move'){ await aiDoMovePhase(); await aiResolvePendingChoices(); }
   } finally {
     bypassTurnGate = false;
     aiThinking = false;
@@ -3620,6 +3789,13 @@ async function noValidMoveContinue(){
   await afterMove(color);
 }
 
+// Mag de mens aan dit toestel deze keuze maken? isMyTurn() alleen volstaat niet: tijdens de beurt
+// van de AI staat bypassTurnGate aan, waardoor de keuzeknoppen van de bot bij de mens verschenen
+// en hij voor de bot kon kiezen.
+function humanMakesChoice(color){
+  return isMyTurn() && !(aiMode && color===aiColor);
+}
+
 function renderTowerBuildChoice(){
   const el = document.getElementById('towerBuildChoice');
   el.innerHTML = '';
@@ -3630,12 +3806,12 @@ function renderTowerBuildChoice(){
   const info = document.createElement('div');
   info.className = 'status-line';
   info.style.width = '100%';
-  info.textContent = isMyTurn()
+  info.textContent = humanMakesChoice(color)
     ? `Er liggen meerdere kaarten met waarde ${need} klaar — kies welke je gebruikt om je toren op te waarderen:`
     : `${label(color)} kiest welke kaart met waarde ${need} de toren opwaardeert…`;
   el.appendChild(info);
 
-  if(!isMyTurn()) return;
+  if(!humanMakesChoice(color)) return;
   const row = document.createElement('div');
   row.className = 'hand';
   state.towerBuild.pendingCandidates.forEach((item, idx) => {
@@ -3669,11 +3845,11 @@ function renderReviveChoice(){
   const color = state.reviveChoice.color;
   const info = document.createElement('div');
   info.className = 'status-line'; info.style.width = '100%';
-  info.textContent = isMyTurn()
+  info.textContent = humanMakesChoice(color)
     ? `Je toren bereikte Boer en is teruggezet naar waarde 2! Kies een gesneuvelde kaart om te herleven (komt in je hold), of kies geen enkele:`
     : `${label(color)} kiest of hij een gesneuvelde kaart herleeft…`;
   el.appendChild(info);
-  if(!isMyTurn()) return;
+  if(!humanMakesChoice(color)) return;
 
   const row = document.createElement('div');
   row.className = 'hand';
