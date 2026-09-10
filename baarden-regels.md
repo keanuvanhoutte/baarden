@@ -1,6 +1,6 @@
 # Baarden — Spelregels
 
-> Status: **v0.9 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
+> Status: **v0.9.1 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
 
 ---
 
@@ -189,11 +189,15 @@ Omdat een stapel altijd kleur-per-kleur afwisselt (je kan nooit op je eigen kleu
 ### 8.1b De 2-tegen-Aas-uitzondering — **bevestigd**
 Een Aas is de hoogste waarde, en zou dus normaal door niets verslagen kunnen worden. Als uitzondering hierop geldt: **een 2 kan een Aas verslaan** (ondanks dat 2 normaal de laagste waarde is). Dit is de enige uitzondering op de waarde-volgorde uit sectie 8. Verder gelden voor deze overwinning gewoon de normale regels — dus inclusief 8.1a als die Aas zelf bovenop een stapel lag.
 
+**Bevestigd (v0.9.1):** de uitzondering werkt ook in de andere richting — **een Aas kan een 2 niet slaan**. Een Aas die een 2 van de tegenstander aanvalt, is dus een illegale zet, net zoals een lagere kaart die een hogere aanvalt. Dat geldt voor een gewone 2 **én voor een toren van waarde 2** (zie 8.2).
+
 ### 8.2 Tegen de toren van de tegenstander — **bevestigd, aparte regel**
 | Situatie | Resultaat |
 |---|---|
-| Jouw kaart heeft een **hogere** waarde dan de (eventueel opgewaardeerde) toren, **of** jouw kaart is een 2 tegen een torenwaarde-Aas (kan in de praktijk niet voorkomen, torens gaan nooit hoger dan Boer) | Je **verovert de toren volledig** → **spel voorbij, jij wint.** |
-| Jouw kaart heeft een **gelijke of lagere** waarde | Illegale zet — **gelijke waarde kan de toren dus niet blokkeren/stapelen**, enkel een strikt hogere waarde (of de 2-vs-aas-uitzondering) werkt. Dit is dus anders dan bij een gewone kaart (8.1)! |
+| Jouw kaart heeft een **hogere** waarde dan de (eventueel opgewaardeerde) toren, **of** jouw kaart is een 2 tegen een torenwaarde-Aas (kan in de praktijk niet voorkomen, torens gaan nooit hoger dan Boer) — **uitgezonderd** een Aas tegen een toren van waarde 2 | Je **verovert de toren volledig** → **spel voorbij, jij wint.** |
+| Jouw kaart heeft een **gelijke of lagere** waarde, **of** jouw kaart is een Aas tegen een toren van waarde 2 | Illegale zet — **gelijke waarde kan de toren dus niet blokkeren/stapelen**, enkel een strikt hogere waarde (of de 2-vs-aas-uitzondering) werkt. Dit is dus anders dan bij een gewone kaart (8.1)! |
+
+- **Bevestigd (v0.9.1):** een toren van waarde 2 is **beschermd tegen een Aas** (de 2-tegen-Aas-uitzondering uit 8.1b). Staat je toren op 2 — bij de start, of na een Boer-reset — dan moet de tegenstander hem veroveren met een kaart van 3 tot en met Heer.
 
 - In de digitale versie blijft bij het stapelen (8.1) een klein, leesbaar chipje zichtbaar met de kaart die eronder geblokkeerd ligt. Bij een opgewaardeerde toren zie je enkel de bovenste kaart plus 1 subtiel piepend kaartje erachter (geen aantal).
 
@@ -207,6 +211,7 @@ Geen — alle regels zijn bevestigd. Dit document beschrijft het volledige, afge
 
 ## 10. Wijzigingslog
 
+- **v0.9.1** — Correctie (secties 8.1b en 8.2): een Aas kan een 2 niet slaan — geen gewone 2, en ook geen toren van waarde 2. De 2-tegen-Aas-uitzondering werkt dus in beide richtingen; voorheen liet het spel een Aas een 2 gewoon veroveren.
 - **v0.9** — Nieuwe regel: na een Boer-reset (sectie 7.3) kan die toren de rest van diezelfde ronde niet meer verder opgewaardeerd worden, ook al is er nog een passende kaart beschikbaar. Vanaf de volgende ronde kan dit weer normaal. Daarnaast een belangrijke bugfix: gesneuvelde kaarten zaten per ongeluk in dezelfde aflegstapel als gewone afgelegde kaarten en werden soms per ongeluk herschud/verwijderd — ze hebben nu een eigen, permanente plek die nooit herschud wordt.
 - **v0.8 — Regels volledig afgerond.** Laatste 2 open punten bevestigd: bewegen mag over het volledige bord (alle 21 vakjes, geen zonebeperking), en er is nooit een tijdslimiet per beurt/fase. Aanname 3.1 (welke specifieke 2 de toren wordt) blijft staan maar heeft bevestigd geen enkel spelmatig effect. Sectie 9 (open vragen) is gesloten.
 - **v0.7.6** — Spelregelknop verplaatst van settings naar het hoofdmenu. Spelregel-PDF herschikt zodat hoofdstukken gewoon aan elkaar doorlopen i.p.v. elk op een nieuw blad te beginnen (van 9 naar 4 pagina's).

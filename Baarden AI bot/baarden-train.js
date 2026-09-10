@@ -80,6 +80,7 @@ function evaluateMoveOnBoard(board, color, movingPiece, destCell){
   const twoBeatsAce = (movingPiece.rank==='2' && top.rank==='A');
   const attackerWins = twoBeatsAce || (av > dv);
   const isTie = !twoBeatsAce && (av === dv);
+  if(movingPiece.rank==='A' && top.rank==='2') return {legal:false}; // een Aas kan geen 2 slaan, ook geen toren van 2 (zelfde regel als in het spel)
   if(isTower) return attackerWins ? {legal:true, type:'wins'} : {legal:false};
   if(!attackerWins && !isTie) return {legal:false};
   if(attackerWins) return {legal:true, type:'captured'};

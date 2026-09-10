@@ -439,9 +439,9 @@
       <tr><td>Gelijke waarde</td><td>Jouw kaart komt bovenop — de onderste is geblokkeerd tot de bovenste wegbeweegt.</td></tr>
       <tr><td>Lagere waarde</td><td>Illegale zet.</td></tr>
     </table>
-    <p><b>Uitzondering:</b> een 2 kan een Aas verslaan (enige uitzondering op de waarde-volgorde).</p>
+    <p><b>Uitzondering:</b> een 2 kan een Aas verslaan, en een Aas kan een 2 dus ook niet slaan, ook geen toren van waarde 2 (enige uitzondering op de waarde-volgorde).</p>
     <div class="rcallout warn"><b>Stapel doorbreken:</b> val je een vakje aan met al meer dan 1 kaart erop, dan verdwijnen bij een overwinning <b>alle</b> betrokken kaarten volledig uit het spel — de hele stapel én je eigen aanvallende kaart. Omdat een stapel altijd van kleur wisselt, offer je hiermee bijna altijd ook je eigen kaart op.</div>
-    <p><b>Tegen een toren:</b> enkel een strikt hogere waarde wint (geen stapelen mogelijk) → <b>toren veroverd = spel gewonnen!</b></p>
+    <p><b>Tegen een toren:</b> enkel een strikt hogere waarde wint (geen stapelen mogelijk), maar een Aas kan geen toren van waarde 2 nemen → <b>toren veroverd = spel gewonnen!</b></p>
 
     <h3>4. De toren opwaarderen</h3>
     <p>Begint op waarde 2, kan tot en met <b>Boer</b> versterkt worden met een kaart die precies 1 hoger is dan de huidige waarde. Zo'n kaart komt uit: je <b>hand</b> (Fase 1), <b>naast je toren</b> (Fase 2), of je <b>hold-kaart</b> (Fase 1 of 2).</p>
@@ -455,7 +455,7 @@
     <p>Elke speler heeft er 1, start naast het bord. In Fase 2 leg je hem op een vijandelijke kaart — dat blokkeert alles daaronder volledig, voor altijd, tot jij hem zelf verlegt. Nooit op een toren, nooit op de blok-kaart van de tegenstander, en nooit door de tegenstander te vernietigen of te veroveren.</p>
 
     <h3>7. Het spel winnen</h3>
-    <p>Verplaats een kaart met een strikt hogere waarde dan de toren van je tegenstander naar zijn torenvakje. Zodra dit lukt, verover je de toren volledig — <b>en win je het spel op slag!</b></p>
+    <p>Verplaats een kaart met een strikt hogere waarde dan de toren van je tegenstander naar zijn torenvakje. Zodra dit lukt, verover je de toren volledig — <b>en win je het spel op slag!</b> Staat die toren op waarde 2, dan werkt dat niet met een Aas.</p>
 
     <div class="rules-actions">
       <a id="rulesPdfLink" class="pdf-download-btn" download="baarden-spelregels.pdf" href="#">⬇ Download als PDF</a>
@@ -2808,6 +2808,10 @@ function evaluateMoveOnBoard(board, color, movingPiece, destCell){
   const attackerWins = twoBeatsAce || (av > dv);
   const isTie = !twoBeatsAce && (av === dv);
 
+  // Bevestigd: omgekeerd kan een Aas een 2 ook niet slaan. De 2 is de zwakke plek van de Aas, dus die
+  // aanval is net zo onmogelijk als een lagere kaart die een hogere aanvalt. Dat geldt voor een gewone 2
+  // én voor een toren van waarde 2: zo'n toren is beschermd tegen een Aas.
+  if(movingPiece.rank==='A' && top.rank==='2') return {legal:false};
   if(isTower){
     // Bevestigd: enkel een overwinning (incl. de 2-vs-aas-uitzondering) verovert de toren. Gelijk of lager = illegaal.
     return attackerWins ? {legal:true, type:'wins'} : {legal:false};
@@ -2877,22 +2881,16 @@ function manhattan(a,b){
   return Math.abs(rowIndex(a)-rowIndex(b)) + Math.abs(colOf(a)-colOf(b));
 }
 
-// Verslaat deze kaart die andere in waarde? Inclusief de bevestigde 2-slaat-Aas-uitzondering.
-function beatsInValue(attacker, defender){
-  if(!attacker || !defender) return false;
-  if(attacker.rank==='2' && defender.rank==='A') return true;
-  return valueOf(attacker.rank) > valueOf(defender.rank);
-}
-
 // Is dit stuk op dit vakje een vijandelijke kaart die pal naast de toren van `color` ligt en die
-// toren in waarde verslaat? Het stuk hoeft niet bovenaan te liggen, zodat we ook kunnen vragen
-// wat er onder een blok-kaart zit.
+// toren zou veroveren? Het stuk hoeft niet bovenaan te liggen, zodat we ook kunnen vragen wat er
+// onder een blok-kaart zit. We vragen het aan dezelfde regelfunctie als een echte zet, zodat elke
+// uitzondering (zoals 2 tegen Aas) vanzelf meetelt.
 function isLethalTowerThreat(board, cell, piece, color){
   if(!piece || piece.kind!=='normal' || piece.owner===color) return false;
   const tCell = towerCellOf(color);
   const tStack = board[tCell];
   if(!tStack || !tStack.length) return false;
-  return neighbors(tCell).includes(cell) && beatsInValue(piece, tStack[tStack.length-1]);
+  return neighbors(tCell).includes(cell) && evaluateMoveOnBoard(board, piece.owner, piece, tCell).type==='wins';
 }
 
 // Ligt onder onze blok-kaart op dit vakje zo'n dodelijke kaart? Dan is die blok-kaart het enige
@@ -2915,12 +2913,16 @@ function blockReleasePlan(board, color, phaseIndex){
   const stack = board[cell];
   const buried = stack[stack.length-2];
   if(!buried || buried.kind!=='normal' || buried.owner===color) return null;
+  // Mag een eigen buurkaart de vrijgekomen kaart slaan of er (bij gelijke waarde) bovenop gaan liggen?
+  // Dat vragen we aan dezelfde regelfunctie als een echte zet, op het bord zonder onze blok-kaart, zodat
+  // uitzonderingen zoals "een Aas kan een 2 niet slaan" vanzelf meetellen.
+  const zonderBlok = Object.assign({}, board, { [cell]: stack.slice(0, -1) });
   const attacker = neighbors(cell).find(n=>{
     const s = board[n];
     if(!s || !s.length) return false;
     const top = s[s.length-1];
     if(top.owner!==color || top.kind!=='normal') return false;
-    return beatsInValue(top, buried) || valueOf(top.rank)===valueOf(buried.rank);
+    return evaluateMoveOnBoard(zonderBlok, color, top, cell).legal;
   });
   return attacker ? {cell, attacker} : null;
 }
@@ -3146,13 +3148,16 @@ function blockRelocateThreshold(blockOption, color){
   return AI_BLOCK_RELOCATE_MARGIN;
 }
 
+// Staat er een vijandelijke kaart naast onze toren die hem bij de volgende zet kan veroveren? We vragen
+// het aan de regelfunctie zelf: een eigen waardevergelijking zag een Aas naast een toren van 2 nog als
+// dreiging, terwijl een Aas die toren niet kan nemen.
 function isTowerThreatened(color){
   const opp = other(color);
   const tCell = towerCellOf(color);
-  const tVal = valueOf(topOf(tCell).rank);
   return neighbors(tCell).some(c=>{
     const top = topOf(c);
-    return top && top.owner===opp && top.kind==='normal' && valueOf(top.rank) > tVal;
+    return top && top.owner===opp && top.kind==='normal'
+      && evaluateMoveOnBoard(state.board, opp, top, tCell).type==='wins';
   });
 }
 
