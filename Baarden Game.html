@@ -2955,6 +2955,12 @@ function blockTopCellOf(board, color){
 // voren trekt. Samen met de blok-zetten van de tegenstander in minimaxSearch en de voorrangsregel in
 // isBetterMove houdt dat de bot thuis; gemeten volstond geen van die drie op zich.
 
+// Bevestigd (aanwijzing van de speler): een Aas of 2 van de tegenstander nemen is bijna altijd een sterke zet
+// (een 2 slaat een Aas; elke kaart van 3 tot en met Heer slaat een 2). Die kaarten wegen daarom zwaarder dan
+// hun waarde, zodat de bot zo'n slag niet laat liggen.
+const AI_KEY_CARD_OPP = 8;  // vijandelijke Aas of 2 bovenop een vakje
+const AI_KEY_CARD_OWN = 8;  // eigen Aas of 2 bovenop een vakje: niet zomaar weggeven
+
 function opponentBlockInReserve(forColor){
   return !!(state && state.blockReserve && state.blockReserve[other(forColor)]);
 }
@@ -2976,10 +2982,15 @@ function evalBoardHeuristic(board, forColor){
       if(top.owner===forColor){
         score += val*AI_WEIGHTS.ownCardVal;
         const vooruit = Math.max(0,6-manhattan(cell,towerCellOf(opp)));
-        score += (blokkeerbaar && !eigenGebied.includes(cell) ? 0 : vooruit)*AI_WEIGHTS.ownAdvance;
+        // Buiten het eigen gebied telt vooruitgang enkel voor een aanvalskaart, en pas als de tegenstander
+        // niet meer kan blokkeren. Opwaardeerkaarten (3 tot en met Boer) horen thuis, bij de toren.
+        const telt = eigenGebied.includes(cell) || (!blokkeerbaar && isAttackCard(top.rank));
+        score += (telt ? vooruit : 0)*AI_WEIGHTS.ownAdvance;
+        if(top.rank==='A' || top.rank==='2') score += AI_KEY_CARD_OWN;
       } else {
         score -= val*AI_WEIGHTS.oppCardVal;
         score -= Math.max(0,6-manhattan(cell,towerCellOf(forColor)))*AI_WEIGHTS.oppThreat;
+        if(top.rank==='A' || top.rank==='2') score -= AI_KEY_CARD_OPP;
         if(isLethalTowerThreat(board, cell, top, forColor)) score -= AI_LETHAL_THREAT_PENALTY;
       }
     } else if(top.kind==='block' && top.owner===forColor){
@@ -3079,7 +3090,9 @@ function minimaxSearch(board, depth, maxColor, starter, phaseIndex, alpha, beta,
 // enkel doen als het écht een duidelijk grote winst oplevert. Deze top-level keuzefunctie evalueert
 // ELKE zet apart (i.p.v. enkel de allerbeste terug te geven) en vergelijkt een "zwakke aanval" tegen
 // de beste "veilige" (niet-zwak-aanvallende) zet, met een marge die overwonnen moet worden.
-const AI_WEAK_ATTACK_RANK_CAP = 11; // Boer of lager telt als "zwak" voor deze regel
+// Bevestigd (aanwijzing van de speler): Vrouw, Heer, Aas en 2 zijn de aanvalskaarten. Kaarten van 3 tot en
+// met Boer zijn opwaardeerkaarten: wie daarmee aanvalt, verliest ze voor de toren en neemt er plaats mee in.
+function isAttackCard(rank){ return rank==='Q' || rank==='K' || rank==='A' || rank==='2'; }
 const AI_WEAK_ATTACK_MARGIN = 6;    // vereiste score-winst t.o.v. de veiligste zet om dit toch te doen
 
 // Hoeveel rijen schuift deze zet een kaart op richting de tegenstander? Zwart speelt naar rij a, rood naar rij g.
@@ -3093,12 +3106,14 @@ function rowsForward(mv, color){
 // goed (de bot kan in gedachten altijd nog terug), en dan koos hij de eerste zet in de lijst, vaak een zet
 // naar voren. Bij een gelijke score gaat nu de zet voor die het minst naar voren trekt. Een zet die echt
 // beter scoort, wint gewoon.
+// Bevestigd (aanwijzing van de speler): hetzelfde geldt altijd voor een opwaardeerkaart (3 tot en met Boer),
+// ook als de tegenstander zijn blok-kaart al gebruikt heeft: die kaarten horen niet op aanval.
 const AI_TIE_EPSILON = 1e-6;
-function isBetterMove(entry, huidige, remAanval){
+function isBetterMove(entry, huidige){
   if(!huidige) return true;
   if(entry.score > huidige.score + AI_TIE_EPSILON) return true;
   if(entry.score < huidige.score - AI_TIE_EPSILON) return false;
-  return remAanval && entry.vooruit < huidige.vooruit;
+  return entry.remVooruit < huidige.remVooruit;
 }
 
 function chooseBestMoveCautiously(board, maxColor, starter, phaseIndex){
@@ -3111,7 +3126,7 @@ function chooseBestMoveCautiously(board, maxColor, starter, phaseIndex){
   moves.forEach(mv=>{
     const wasOccupied = !!(board[mv.dest] && board[mv.dest].length);
     const movingTop = board[mv.src][board[mv.src].length-1];
-    const isWeakAttack = wasOccupied && valueOf(movingTop.rank) <= AI_WEAK_ATTACK_RANK_CAP;
+    const isWeakAttack = wasOccupied && !isAttackCard(movingTop.rank);
     const sim = simulateMove(board, curColor, mv.src, mv.dest);
     if(!sim) return;
     let score;
@@ -3121,15 +3136,18 @@ function chooseBestMoveCautiously(board, maxColor, starter, phaseIndex){
     // Veldnaam `move`, net als de lege uitkomsten hierboven en hieronder: aiDoMovePhase leest
     // moveResult.move. Met `mv` was dat altijd leeg, waardoor de bot nooit een gewone kaart
     // verschoof zolang zijn blok-kaart ergens heen kon — en die dus elke beurt verlegde.
-    const entry = {move: mv, score, vooruit: rowsForward(mv, curColor)};
-    if(isBetterMove(entry, bestOverall, remAanval)) bestOverall = entry;
-    if(!isWeakAttack && isBetterMove(entry, bestSafe, remAanval)) bestSafe = entry;
+    // remVooruit: hoeveel rijen deze zet naar voren gaat, als dat ongewenst is (tegenstander kan nog
+    // blokkeren, of het is een opwaardeerkaart). Bij een gelijke score wint de laagste waarde.
+    const vooruit = rowsForward(mv, curColor);
+    const entry = {move: mv, score, remVooruit: (remAanval || !isAttackCard(movingTop.rank)) ? vooruit : 0};
+    if(isBetterMove(entry, bestOverall)) bestOverall = entry;
+    if(!isWeakAttack && isBetterMove(entry, bestSafe)) bestSafe = entry;
   });
   if(!bestOverall) return {score:-Infinity, move:null};
   const overallWasWeakAttack = (()=>{
     const wasOccupied = !!(board[bestOverall.move.dest] && board[bestOverall.move.dest].length);
     const movingTop = board[bestOverall.move.src][board[bestOverall.move.src].length-1];
-    return wasOccupied && valueOf(movingTop.rank) <= AI_WEAK_ATTACK_RANK_CAP;
+    return wasOccupied && !isAttackCard(movingTop.rank);
   })();
   if(overallWasWeakAttack && bestSafe && (bestOverall.score - bestSafe.score) < AI_WEAK_ATTACK_MARGIN){
     return bestSafe;
