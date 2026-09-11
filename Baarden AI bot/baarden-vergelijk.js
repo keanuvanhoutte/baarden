@@ -218,6 +218,7 @@ async function speelPartij(zwart, rood, seed){
   let stilstand = 0;
 
   for(let beurt=0; beurt<MAX_BEURTEN; beurt++){
+    if(s.winner==='draw') return { winnaar: null, reden: 'gelijkspel (3x dezelfde stelling)', rondes: s.roundNumber, hulp };
     if(s.winner) return { winnaar: s.winner, rondes: s.roundNumber, hulp };
     if(s.roundNumber > MAX_RONDES) return { winnaar: null, reden: 'rondelimiet', rondes: s.roundNumber, hulp };
 

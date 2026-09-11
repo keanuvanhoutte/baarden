@@ -1,6 +1,6 @@
 # Baarden — Spelregels
 
-> Status: **v0.9.1 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
+> Status: **v0.10 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
 
 ---
 
@@ -201,6 +201,12 @@ Een Aas is de hoogste waarde, en zou dus normaal door niets verslagen kunnen wor
 
 - In de digitale versie blijft bij het stapelen (8.1) een klein, leesbaar chipje zichtbaar met de kaart die eronder geblokkeerd ligt. Bij een opgewaardeerde toren zie je enkel de bovenste kaart plus 1 subtiel piepend kaartje erachter (geen aantal).
 
+### 8.3 Gelijkspel door herhaling — **bevestigd**
+Net als in schaken: komt **exact dezelfde stelling voor de 3de keer** voor, dan eindigt het spel meteen in een **gelijkspel**. Dezelfde stelling betekent: alle kaarten, torens en blok-kaarten liggen op precies dezelfde plek, en **dezelfde speler is aan zet in dezelfde fase**. De keren hoeven niet na elkaar te komen; elke keer telt mee.
+
+- Enkel wat op het bord ligt telt. Handkaarten, hold, trekstapel en aflegstapel spelen voor de herhaling geen rol.
+- In de digitale versie verschijnt na de **2de keer** een kleine waarschuwing naast "aan zet", zodat je nog kan uitwijken.
+
 ---
 
 ## 9. Openstaande vragen
@@ -211,6 +217,7 @@ Geen — alle regels zijn bevestigd. Dit document beschrijft het volledige, afge
 
 ## 10. Wijzigingslog
 
+- **v0.10** — Nieuwe regel (sectie 8.3): komt exact dezelfde stelling (zelfde bord, zelfde speler aan zet in dezelfde fase) voor de 3de keer voor, dan eindigt het spel in een gelijkspel, net als in schaken. De digitale versie waarschuwt subtiel na de 2de keer.
 - **v0.9.1** — Correctie (secties 8.1b en 8.2): een Aas kan een 2 niet slaan — geen gewone 2, en ook geen toren van waarde 2. De 2-tegen-Aas-uitzondering werkt dus in beide richtingen; voorheen liet het spel een Aas een 2 gewoon veroveren.
 - **v0.9** — Nieuwe regel: na een Boer-reset (sectie 7.3) kan die toren de rest van diezelfde ronde niet meer verder opgewaardeerd worden, ook al is er nog een passende kaart beschikbaar. Vanaf de volgende ronde kan dit weer normaal. Daarnaast een belangrijke bugfix: gesneuvelde kaarten zaten per ongeluk in dezelfde aflegstapel als gewone afgelegde kaarten en werden soms per ongeluk herschud/verwijderd — ze hebben nu een eigen, permanente plek die nooit herschud wordt.
 - **v0.8 — Regels volledig afgerond.** Laatste 2 open punten bevestigd: bewegen mag over het volledige bord (alle 21 vakjes, geen zonebeperking), en er is nooit een tijdslimiet per beurt/fase. Aanname 3.1 (welke specifieke 2 de toren wordt) blijft staan maar heeft bevestigd geen enkel spelmatig effect. Sectie 9 (open vragen) is gesloten.
