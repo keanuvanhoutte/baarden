@@ -2881,16 +2881,29 @@ function manhattan(a,b){
   return Math.abs(rowIndex(a)-rowIndex(b)) + Math.abs(colOf(a)-colOf(b));
 }
 
-// Is dit stuk op dit vakje een vijandelijke kaart die pal naast de toren van `color` ligt en die
-// toren zou veroveren? Het stuk hoeft niet bovenaan te liggen, zodat we ook kunnen vragen wat er
-// onder een blok-kaart zit. We vragen het aan dezelfde regelfunctie als een echte zet, zodat elke
-// uitzondering (zoals 2 tegen Aas) vanzelf meetelt.
+// Zou deze kaart een toren van deze waarde veroveren? We vragen het aan dezelfde regelfunctie als een
+// echte zet, zodat elke uitzondering (zoals "een Aas kan geen toren van 2 nemen") vanzelf meetelt.
+function wouldTakeTower(piece, color, waarde){
+  const tCell = towerCellOf(color);
+  const rank = RANKS.find(r => valueOf(r)===waarde);
+  return evaluateMoveOnBoard({ [tCell]: [{owner:color, kind:'tower', rank}] }, piece.owner, piece, tCell).type==='wins';
+}
+
+// Is dit stuk op dit vakje een vijandelijke kaart pal naast de toren van `color`, die de toren nu zou
+// veroveren of na zijn volgende opwaardering? Het stuk hoeft niet bovenaan te liggen, zodat we ook
+// kunnen vragen wat er onder een blok-kaart zit.
+// Bevestigd: dat tweede telt mee omdat een toren van waarde 2 alleen tegen een Aas beschermd is zolang
+// hij op 2 blijft. Om vooruit te komen moet hij naar 3 of hoger, en dan wint die Aas meteen. Een Aas
+// naast een toren van 2 is dus niet veilig, en zijn blok-kaart daarvan weghalen ook niet.
 function isLethalTowerThreat(board, cell, piece, color){
   if(!piece || piece.kind!=='normal' || piece.owner===color) return false;
   const tCell = towerCellOf(color);
   const tStack = board[tCell];
-  if(!tStack || !tStack.length) return false;
-  return neighbors(tCell).includes(cell) && evaluateMoveOnBoard(board, piece.owner, piece, tCell).type==='wins';
+  if(!tStack || !tStack.length || !neighbors(tCell).includes(cell)) return false;
+  const nu = valueOf(tStack[tStack.length-1].rank);
+  if(wouldTakeTower(piece, color, nu)) return true;
+  // Een opwaardering naar Boer zet de toren terug op 2; dat geval bewaakt towerUpgradeExposesTower.
+  return nu+1 < TOWER_CAP && wouldTakeTower(piece, color, nu+1);
 }
 
 // Ligt onder onze blok-kaart op dit vakje zo'n dodelijke kaart? Dan is die blok-kaart het enige
@@ -3161,10 +3174,33 @@ function isTowerThreatened(color){
   });
 }
 
+// Maakt deze opwaardering de toren kwetsbaar? We kijken naar de toren zoals hij NA de opbouw wordt:
+//  - Bevestigd: een toren van 2 is enkel tegen een Aas beschermd zolang hij op 2 blijft. Naar 3 of
+//    hoger opwaarderen met een vrije Aas ernaast geeft die Aas een winnende zet.
+//  - Bereikt de opbouw Boer, dan valt de toren terug naar 2, en wint elke vrije kaart van 3 tot en met
+//    Heer ernaast.
+// Een vijandelijke kaart die vrijkomt doordat de eigen bordkaart erboven in de toren verdwijnt, telt
+// ook mee. Is de toren daarna te nemen, dan wacht de bot met opwaarderen tot die kaart geblokkeerd of
+// weggeslagen is.
+function towerUpgradeExposesTower(board, color, chain){
+  if(!chain.length) return false;
+  const tCell = towerCellOf(color);
+  const tStack = board[tCell];
+  let waarde = valueOf(tStack[tStack.length-1].rank) + chain.length;
+  if(waarde >= TOWER_CAP) waarde = 2;
+  const opgebruikt = chain.filter(i=>i.source==='orthogonal').map(i=>i.cell);
+  return neighbors(tCell).some(cell=>{
+    const stack = board[cell];
+    if(!stack || !stack.length) return false;
+    const kaart = stack[opgebruikt.includes(cell) ? stack.length-2 : stack.length-1];
+    return !!kaart && kaart.kind==='normal' && kaart.owner!==color && wouldTakeTower(kaart, color, waarde);
+  });
+}
+
 async function aiDoPlacePhase(){
   const color = aiColor;
   const chain = state.towerResetThisRound[color] ? [] : computeTowerChain(color,'place');
-  if(chain.length>0 && chainIncludesHand(chain)){
+  if(chain.length>0 && chainIncludesHand(chain) && !towerUpgradeExposesTower(state.board, color, chain)){
     await startTowerBuild('place');
     return;
   }
@@ -3191,7 +3227,9 @@ async function aiDoMovePhase(){
   const color = aiColor;
   const threatened = isTowerThreatened(color);
   const chain = state.towerResetThisRound[color] ? [] : computeTowerChain(color,'move');
-  if(chain.length>0 && !threatened){
+  // Niet opwaarderen als de toren daarna te nemen is (zie towerUpgradeExposesTower). Dan eerst die
+  // kaart blokkeren of wegslaan; de waardering straft een vrije Aas naast een toren van 2 daar ook voor.
+  if(chain.length>0 && !threatened && !towerUpgradeExposesTower(state.board, color, chain)){
     await startTowerBuild('move');
     return;
   }
