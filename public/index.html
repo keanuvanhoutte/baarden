@@ -2949,9 +2949,21 @@ function blockTopCellOf(board, color){
   }) || null;
 }
 
+// Bevestigd (aanwijzing van de speler): zolang de tegenstander zijn blok-kaart nog naast het bord heeft,
+// werkt een eenzame aanval niet, want die kaart wordt gewoon geblokkeerd. Een eigen kaart buiten het
+// eigen gebied levert dan geen punten voor vooruitgang op, zodat de bot niet vroeg met één kaart naar
+// voren trekt. Samen met de blok-zetten van de tegenstander in minimaxSearch en de voorrangsregel in
+// isBetterMove houdt dat de bot thuis; gemeten volstond geen van die drie op zich.
+
+function opponentBlockInReserve(forColor){
+  return !!(state && state.blockReserve && state.blockReserve[other(forColor)]);
+}
+
 // Heuristische bordwaardering vanuit het perspectief van forColor. Hoger = beter voor forColor.
 function evalBoardHeuristic(board, forColor){
   const opp = other(forColor);
+  const blokkeerbaar = opponentBlockInReserve(forColor);
+  const eigenGebied = forColor==='red' ? RED_TERRITORY : BLACK_TERRITORY;
   let score = 0;
   const myT = board[towerCellOf(forColor)], oppT = board[towerCellOf(opp)];
   score += (valueOf(myT[myT.length-1].rank) - valueOf(oppT[oppT.length-1].rank)) * AI_WEIGHTS.towerDiff;
@@ -2963,7 +2975,8 @@ function evalBoardHeuristic(board, forColor){
       const val = valueOf(top.rank);
       if(top.owner===forColor){
         score += val*AI_WEIGHTS.ownCardVal;
-        score += Math.max(0,6-manhattan(cell,towerCellOf(opp)))*AI_WEIGHTS.ownAdvance;
+        const vooruit = Math.max(0,6-manhattan(cell,towerCellOf(opp)));
+        score += (blokkeerbaar && !eigenGebied.includes(cell) ? 0 : vooruit)*AI_WEIGHTS.ownAdvance;
       } else {
         score -= val*AI_WEIGHTS.oppCardVal;
         score -= Math.max(0,6-manhattan(cell,towerCellOf(forColor)))*AI_WEIGHTS.oppThreat;
@@ -3018,23 +3031,38 @@ function nextTurnState(starter, phaseIndex){
   return phaseIndex===0 ? {starter, phaseIndex:1} : {starter: other(starter), phaseIndex:0};
 }
 
-function minimaxSearch(board, depth, maxColor, starter, phaseIndex, alpha, beta){
+// oppBlok: heeft de tegenstander zijn blok-kaart op deze lijn nog naast het bord? Laat je hem weg, dan
+// geldt de echte spelstand.
+function minimaxSearch(board, depth, maxColor, starter, phaseIndex, alpha, beta, oppBlok){
+  if(oppBlok===undefined) oppBlok = opponentBlockInReserve(maxColor);
   const curColor = moverOf(starter, phaseIndex);
+  const maximizing = (curColor===maxColor);
   const moves = getLegalNormalMoves(board, curColor);
+  // Bevestigd (aanwijzing van de speler): een aanval werkt niet zolang de tegenstander zijn blok-kaart
+  // nog naast het bord heeft; die legt hem gewoon op de aanvaller. Daarom mag de tegenstander dat hier
+  // ook. Zonder deze zetten leek een eenzame kaart naast de vijandelijke toren een zekere winst.
+  if(!maximizing && oppBlok){
+    getBlockTargetsOnBoard(board, curColor).forEach(target => moves.push({ block: target }));
+  }
   if(depth===0 || moves.length===0){
     return { score: evalBoardHeuristic(board, maxColor) };
   }
   let bestMove = null;
-  const maximizing = (curColor===maxColor);
   let best = maximizing ? -Infinity : Infinity;
   const nextState = nextTurnState(starter, phaseIndex);
   for(const mv of moves){
-    const sim = simulateMove(board, curColor, mv.src, mv.dest);
-    if(!sim) continue;
     let score;
-    if(sim.winner===maxColor) score = 1e6 - (AI_SEARCH_DEPTH-depth);
-    else if(sim.winner) score = -1e6 + (AI_SEARCH_DEPTH-depth);
-    else score = minimaxSearch(sim.board, depth-1, maxColor, nextState.starter, nextState.phaseIndex, alpha, beta).score;
+    if(mv.block){
+      const nb = JSON.parse(JSON.stringify(board));
+      nb[mv.block].push({ owner: curColor, kind: 'block' });
+      score = minimaxSearch(nb, depth-1, maxColor, nextState.starter, nextState.phaseIndex, alpha, beta, false).score;
+    } else {
+      const sim = simulateMove(board, curColor, mv.src, mv.dest);
+      if(!sim) continue;
+      if(sim.winner===maxColor) score = 1e6 - (AI_SEARCH_DEPTH-depth);
+      else if(sim.winner) score = -1e6 + (AI_SEARCH_DEPTH-depth);
+      else score = minimaxSearch(sim.board, depth-1, maxColor, nextState.starter, nextState.phaseIndex, alpha, beta, oppBlok).score;
+    }
     if(maximizing){
       if(score>best){ best=score; bestMove=mv; }
       alpha = Math.max(alpha, score);
@@ -3054,12 +3082,32 @@ function minimaxSearch(board, depth, maxColor, starter, phaseIndex, alpha, beta)
 const AI_WEAK_ATTACK_RANK_CAP = 11; // Boer of lager telt als "zwak" voor deze regel
 const AI_WEAK_ATTACK_MARGIN = 6;    // vereiste score-winst t.o.v. de veiligste zet om dit toch te doen
 
+// Hoeveel rijen schuift deze zet een kaart op richting de tegenstander? Zwart speelt naar rij a, rood naar rij g.
+function rowsForward(mv, color){
+  const d = rowIndex(mv.dest) - rowIndex(mv.src);
+  return color==='red' ? d : -d;
+}
+
+// Bevestigd (aanwijzing van de speler): zolang de tegenstander zijn blok-kaart nog naast het bord heeft,
+// werkt een eenzame aanval niet. In rustige posities scoren veel zetten binnen de zoekdiepte exact even
+// goed (de bot kan in gedachten altijd nog terug), en dan koos hij de eerste zet in de lijst, vaak een zet
+// naar voren. Bij een gelijke score gaat nu de zet voor die het minst naar voren trekt. Een zet die echt
+// beter scoort, wint gewoon.
+const AI_TIE_EPSILON = 1e-6;
+function isBetterMove(entry, huidige, remAanval){
+  if(!huidige) return true;
+  if(entry.score > huidige.score + AI_TIE_EPSILON) return true;
+  if(entry.score < huidige.score - AI_TIE_EPSILON) return false;
+  return remAanval && entry.vooruit < huidige.vooruit;
+}
+
 function chooseBestMoveCautiously(board, maxColor, starter, phaseIndex){
   const curColor = moverOf(starter, phaseIndex);
   const moves = getLegalNormalMoves(board, curColor);
   if(moves.length===0) return {score:-Infinity, move:null};
   const nextState = nextTurnState(starter, phaseIndex);
   let bestOverall = null, bestSafe = null;
+  const remAanval = !!(state && state.blockReserve && state.blockReserve[other(curColor)]);
   moves.forEach(mv=>{
     const wasOccupied = !!(board[mv.dest] && board[mv.dest].length);
     const movingTop = board[mv.src][board[mv.src].length-1];
@@ -3073,9 +3121,9 @@ function chooseBestMoveCautiously(board, maxColor, starter, phaseIndex){
     // Veldnaam `move`, net als de lege uitkomsten hierboven en hieronder: aiDoMovePhase leest
     // moveResult.move. Met `mv` was dat altijd leeg, waardoor de bot nooit een gewone kaart
     // verschoof zolang zijn blok-kaart ergens heen kon — en die dus elke beurt verlegde.
-    const entry = {move: mv, score};
-    if(!bestOverall || score>bestOverall.score) bestOverall = entry;
-    if(!isWeakAttack && (!bestSafe || score>bestSafe.score)) bestSafe = entry;
+    const entry = {move: mv, score, vooruit: rowsForward(mv, curColor)};
+    if(isBetterMove(entry, bestOverall, remAanval)) bestOverall = entry;
+    if(!isWeakAttack && isBetterMove(entry, bestSafe, remAanval)) bestSafe = entry;
   });
   if(!bestOverall) return {score:-Infinity, move:null};
   const overallWasWeakAttack = (()=>{
@@ -3149,9 +3197,12 @@ const AI_BLOCK_RELOCATE_MARGIN = 12;   // vereiste extra winst om een al liggend
 const AI_BLOCK_RELOCATE_COOLDOWN = 3;  // ronden na een (ver)legging waarin een hogere drempel geldt
 const AI_BLOCK_COOLDOWN_MARGIN = AI_LETHAL_THREAT_PENALTY/2; // binnen die ronden: enkel om een kaart van onze toren weg te houden
 const AI_BLOCK_RELEASE_BONUS = 20;     // waarde van een blok-kaart die via de bevrijdings-truc terug vrij komt
+const AI_BLOCK_FIRST_PLACE_MARGIN = 3; // een verse blok-kaart niet verspillen op een onschuldige kaart
 
 function blockRelocateThreshold(blockOption, color){
-  if(!blockOption.relocation) return 0; // eerste plaatsing: die mag gewoon op score winnen
+  // Eerste plaatsing: de blok-kaart is maar één keer vers. Zonder marge legde de bot hem op een onschuldige
+  // kaart ver weg zodra een aanval hem niets meer opleverde.
+  if(!blockOption.relocation) return AI_BLOCK_FIRST_PLACE_MARGIN;
   if(blockOption.release) return 0;     // bevrijdings-truc: bewust gespeeld, dus geen rem en geen afkoelperiode
   const laatsteRonde = (state.blockMovedRound && state.blockMovedRound[color]) || 0;
   // Vlak na een (ver)legging blijft de blok-kaart liggen, tenzij verleggen een kaart tegenhoudt die
@@ -3308,7 +3359,7 @@ async function aiDoMovePhase(){
 
   // Bevestigd: vergelijk de blok-kaart als volwaardig alternatief t.o.v. de beste gewone zet,
   // i.p.v. hem enkel als noodgreep te gebruiken wanneer er toevallig geen andere zet meer is.
-  // Voor een EERSTE plaatsing volstaat dat hij beter scoort. Voor een VERLEGGING niet: een blok
+  // Een EERSTE plaatsing moet een kleine marge halen. Voor een VERLEGGING ligt de lat hoger: een blok
   // die ergens goed ligt weer oppakken kost altijd iets (de kaart eronder komt vrij), dus dat mag
   // enkel voor een duidelijke winst — anders bleef de bot zijn blok-kaart rondsjouwen en gaf hij
   // een kaart vrij die het spel meteen kon beslissen. De bevrijdings-truc (als tweede bewegen,
