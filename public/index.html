@@ -3146,6 +3146,32 @@ function minimaxSearch(board, depth, maxColor, starter, phaseIndex, alpha, beta,
 function isAttackCard(rank){ return rank==='Q' || rank==='K' || rank==='A' || rank==='2'; }
 const AI_WEAK_ATTACK_MARGIN = 6;    // vereiste score-winst t.o.v. de veiligste zet om dit toch te doen
 
+/* ---------- Gelijkspel door herhaling, voor de bot ---------- */
+// Bevestigd (spelregel 8.3): een actie die de stelling voor de 3de keer laat voorkomen, beëindigt het spel meteen
+// in een gelijkspel. De bot weegt zo'n actie als AI_DRAW_SCORE, een gelijke stand. Staat hij voor, dan scoren
+// zijn andere zetten hoger en speelt hij door; staat hij achter (een lagere toren, een dreiging die hij niet
+// kan stoppen), dan is het gelijkspel zijn beste uitweg. Herhalingen dieper in de zoekboom rekent hij niet na,
+// enkel de actie die hij nu zelf doet.
+const AI_DRAW_SCORE = 0;
+
+// Welke stelling staat er na een afgeronde actie van `color`? Volgt exact afterPlace en afterMove.
+function positionAfterAction(board, color, soort){
+  const gedaan = Object.assign({}, state.actedThisPhase, { [color]: true });
+  const rondeKlaar = gedaan.red && gedaan.black;
+  if(soort==='place'){
+    return rondeKlaar ? { board, turn: state.starter, phase: 'move' } : { board, turn: other(color), phase: 'place' };
+  }
+  if(!rondeKlaar) return { board, turn: other(color), phase: 'move' };
+  const stapelsLeeg = noCardsLeftToDraw('red') && noCardsLeftToDraw('black');
+  return { board, turn: other(state.starter), phase: stapelsLeeg ? 'move' : 'draw' };
+}
+
+// Eindigt deze actie in een gelijkspel, omdat de stelling erna al 2 keer voorkwam?
+function endsInRepetitionDraw(board, color, soort){
+  if(!state || !state.positionCounts) return false;
+  return (state.positionCounts[positionKey(positionAfterAction(board, color, soort))] || 0) >= 2;
+}
+
 // Hoeveel rijen schuift deze zet een kaart op richting de tegenstander? Zwart speelt naar rij a, rood naar rij g.
 function rowsForward(mv, color){
   const d = rowIndex(mv.dest) - rowIndex(mv.src);
@@ -3184,6 +3210,7 @@ function chooseBestMoveCautiously(board, maxColor, starter, phaseIndex){
     if(sim.winner===maxColor) score = 1e6;
     else if(sim.winner) score = -1e6;
     else score = minimaxSearch(sim.board, AI_SEARCH_DEPTH-1, maxColor, nextState.starter, nextState.phaseIndex, -Infinity, Infinity).score;
+    if(!sim.winner && endsInRepetitionDraw(sim.board, curColor, 'move')) score = AI_DRAW_SCORE;
     // Veldnaam `move`, net als de lege uitkomsten hierboven en hieronder: aiDoMovePhase leest
     // moveResult.move. Met `mv` was dat altijd leeg, waardoor de bot nooit een gewone kaart
     // verschoof zolang zijn blok-kaart ergens heen kon — en die dus elke beurt verlegde.
@@ -3248,16 +3275,19 @@ function bestBlockOption(board, color, starter, phaseIndex){
   if(targets.length===0) return null;
   const nextState = nextTurnState(starter, phaseIndex);
   let best=null, bestScore=-Infinity;
+  let bestIsGelijkspel = false;
   targets.forEach(target=>{
     const nb = simulateBlockPlacement(board, color, target);
-    const contScore = minimaxSearch(nb, Math.max(0,AI_SEARCH_DEPTH-1), color, nextState.starter, nextState.phaseIndex, -Infinity, Infinity).score;
-    if(contScore > bestScore){ bestScore = contScore; best = target; }
+    const gelijkspel = endsInRepetitionDraw(nb, color, 'move');
+    const contScore = gelijkspel ? AI_DRAW_SCORE
+      : minimaxSearch(nb, Math.max(0,AI_SEARCH_DEPTH-1), color, nextState.starter, nextState.phaseIndex, -Infinity, Infinity).score;
+    if(contScore > bestScore){ bestScore = contScore; best = target; bestIsGelijkspel = gelijkspel; }
   });
   if(best===null) return null;
   // De zoekboom ziet het wegslaan van de vrijgekomen kaart al, maar niet wat een terug vrije
   // blok-kaart waard is: die kan voortaan elders een dreiging smoren i.p.v. eeuwig op één kaart
   // te liggen. Die winst aan speelruimte tellen we er hier bij.
-  if(release) bestScore += AI_BLOCK_RELEASE_BONUS;
+  if(release && !bestIsGelijkspel) bestScore += AI_BLOCK_RELEASE_BONUS; // een gelijkspel levert geen speelruimte meer op
   return {target:best, score:bestScore, relocation: !!fromCell, release: !!release};
 }
 
@@ -3395,14 +3425,17 @@ async function aiDoPlacePhase(){
   const hold = state.hold[color];
   const pasScore = aiPassScore(state.board, color);
   // Leggen of in hold leggen moet passen minstens met AI_PLACE_MIN_GAIN verslaan; anders past de bot.
-  let best = {soort:'pas', score: pasScore + AI_PLACE_MIN_GAIN};
+  // Passen en in hold leggen laten het bord zoals het is. Kwam die stelling al 2 keer voor, dan betekenen ze
+  // een gelijkspel, en wegen ze ook zo.
+  const blijftGelijkspel = endsInRepetitionDraw(state.board, color, 'place');
+  let best = {soort:'pas', score: blijftGelijkspel ? AI_DRAW_SCORE : pasScore + AI_PLACE_MIN_GAIN};
   state.hand[color].forEach((card, idx)=>{
     freeCells.forEach(cell=>{
       const sc = aiPlacementScore(state.board, color, card, cell, hold);
       if(sc > best.score) best = {soort:'veld', idx, cell, score:sc};
     });
     if(!hold && isUsefulUpgradeValue(state.board, color, valueOf(card.rank), null)){
-      const sc = pasScore + AI_HOLD_UPGRADE_BONUS;
+      const sc = blijftGelijkspel ? AI_DRAW_SCORE : pasScore + AI_HOLD_UPGRADE_BONUS;
       if(sc > best.score) best = {soort:'hold', idx, score:sc};
     }
   });
