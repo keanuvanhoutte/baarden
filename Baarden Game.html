@@ -3174,6 +3174,72 @@ function isTowerThreatened(color){
   });
 }
 
+/* ---------- Legfase: of en waar de bot een kaart legt ---------- */
+// Bevestigd (aanwijzingen van de speler):
+//  1. Niet elke ronde een kaart leggen. Kaarten rond de eigen toren die niet binnenkort in de toren
+//     passen, bezetten opwaardeervakjes en nemen elkaar bewegingsruimte af. Passen is een echte keuze,
+//     en een bruikbare opwaardeerkaart kan ook in hold.
+//  2. Het opwaardeervakje richting het midden (e2 voor zwart, c2 voor rood) komt snel onder druk:
+//     kaarten van 3 tot en met Boer raken daar klem voor ze de toren in kunnen.
+// Bewust GEEN bonus om bruikbare opwaardeerkaarten naast de toren te leggen: gemeten met
+// baarden-vergelijk.js maakte zo'n bonus de bot duidelijk zwakker (42% winst tegenover de vorige
+// versie), terwijl deze regels zonder die bonus 60% haalden.
+const AI_UPGRADE_WINDOW = 3;            // "binnenkort bruikbaar": tot 3 boven de huidige torenwaarde
+const AI_PLACE_SLOT_PENALTY = 3;        // kaart die niet binnenkort past, op een veilig opwaardeervakje
+const AI_PLACE_FRONT_SLOT_PENALTY = 4;  // kaart van 3 t.e.m. Boer op het opwaardeervakje richting het midden
+const AI_PLACE_CROWD_FREE = 3;          // zoveel eigen kaarten in het eigen gebied zijn nog geen opstopping
+const AI_PLACE_CROWD_PENALTY = 1.5;     // per eigen kaart in het eigen gebied daarboven
+const AI_HOLD_UPGRADE_BONUS = 2;        // bruikbare opwaardeerkaart in een lege hold
+const AI_PLACE_MIN_GAIN = 0.5;          // wat leggen minstens moet opleveren tegenover passen
+
+function frontUpgradeCellOf(color){ return color==='red' ? 'c2' : 'e2'; }
+
+function crowdPenalty(board, color){
+  const zone = color==='red' ? RED_TERRITORY : BLACK_TERRITORY;
+  const eigen = zone.filter(c=>{
+    const s = board[c];
+    const top = s && s[s.length-1];
+    return top && top.owner===color && top.kind==='normal';
+  }).length;
+  return Math.max(0, eigen - AI_PLACE_CROWD_FREE) * AI_PLACE_CROWD_PENALTY;
+}
+
+// Past een kaart met deze waarde binnenkort in de toren? Enkel net boven de huidige torenwaarde, en niet
+// als er al een eigen kaart met die waarde klaarligt naast de toren of in hold.
+function isUsefulUpgradeValue(board, color, waarde, hold){
+  const tCell = towerCellOf(color);
+  const tStack = board[tCell];
+  const toren = valueOf(tStack[tStack.length-1].rank);
+  if(waarde <= toren || waarde > Math.min(TOWER_CAP, toren + AI_UPGRADE_WINDOW)) return false;
+  if(hold && valueOf(hold.rank)===waarde) return false;
+  return !neighbors(tCell).some(c=>{
+    const s = board[c];
+    const top = s && s[s.length-1];
+    return top && top.owner===color && top.kind==='normal' && valueOf(top.rank)===waarde;
+  });
+}
+
+// Hoe goed is passen? De bordwaardering zoals ze nu is, min een eventuele opstopping. Leggen en hold
+// worden hiermee vergeleken.
+function aiPassScore(board, color){
+  return evalBoardHeuristic(board, color) - crowdPenalty(board, color);
+}
+
+// Hoe goed is het om deze handkaart op dit vakje te leggen? De gewone bordwaardering, bijgestuurd met de
+// twee aanwijzingen hierboven.
+function aiPlacementScore(board, color, card, cell, hold){
+  const nb = JSON.parse(JSON.stringify(board));
+  nb[cell] = [{owner:color, kind:'normal', rank:card.rank, suit:card.suit, id:card.id}];
+  let score = aiPassScore(nb, color);
+  const waarde = valueOf(card.rank);
+  if(cell===frontUpgradeCellOf(color)){
+    if(waarde>=3 && waarde<=TOWER_CAP) score -= AI_PLACE_FRONT_SLOT_PENALTY;
+  } else if(neighbors(towerCellOf(color)).includes(cell) && !isUsefulUpgradeValue(board, color, waarde, hold)){
+    score -= AI_PLACE_SLOT_PENALTY;
+  }
+  return score;
+}
+
 // Maakt deze opwaardering de toren kwetsbaar? We kijken naar de toren zoals hij NA de opbouw wordt:
 //  - Bevestigd: een toren van 2 is enkel tegen een Aas beschermd zolang hij op 2 blijft. Naar 3 of
 //    hoger opwaarderen met een vrije Aas ernaast geeft die Aas een winnende zet.
@@ -3206,21 +3272,24 @@ async function aiDoPlacePhase(){
   }
   const zone = color==='red' ? RED_TERRITORY : BLACK_TERRITORY;
   const freeCells = zone.filter(c=>!state.board[c]);
-  let best=null, bestScore=-Infinity;
+  const hold = state.hold[color];
+  const pasScore = aiPassScore(state.board, color);
+  // Leggen of in hold leggen moet passen minstens met AI_PLACE_MIN_GAIN verslaan; anders past de bot.
+  let best = {soort:'pas', score: pasScore + AI_PLACE_MIN_GAIN};
   state.hand[color].forEach((card, idx)=>{
     freeCells.forEach(cell=>{
-      const nb = JSON.parse(JSON.stringify(state.board));
-      nb[cell] = [{owner:color, kind:'normal', rank:card.rank, suit:card.suit, id:card.id}];
-      const sc = evalBoardHeuristic(nb, color);
-      if(sc>bestScore){ bestScore=sc; best={idx,cell}; }
+      const sc = aiPlacementScore(state.board, color, card, cell, hold);
+      if(sc > best.score) best = {soort:'veld', idx, cell, score:sc};
     });
+    if(!hold && isUsefulUpgradeValue(state.board, color, valueOf(card.rank), null)){
+      const sc = pasScore + AI_HOLD_UPGRADE_BONUS;
+      if(sc > best.score) best = {soort:'hold', idx, score:sc};
+    }
   });
-  if(best){
-    state.selected = {idx:best.idx, card:state.hand[color][best.idx]};
-    await placeOnField(best.cell);
-  } else {
-    await passPlace();
-  }
+  if(best.soort==='pas'){ await passPlace(); return; }
+  state.selected = {idx:best.idx, card:state.hand[color][best.idx]};
+  if(best.soort==='hold') await placeInHold();
+  else await placeOnField(best.cell);
 }
 
 async function aiDoMovePhase(){
