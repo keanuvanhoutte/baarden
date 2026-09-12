@@ -96,19 +96,142 @@
      volle-breedte "Terug"-knop, wat er onafgewerkt uitzag. */
   .subpanel-primary{ display:block; width:100%; margin:8px 0 0 0; text-align:center; }
 
+  /* Tegen AI: kleur, moeilijkheid en de tegenstander die erbij hoort. De kleur van de gekozen stand
+     (--niveau-kleur en --niveau-gloed, gezet vanuit het script) loopt door in de slider, de rand rond
+     het mannetje en zijn naam: van groen (Bob, makkelijk) naar rood (Stefaan, moeilijk). */
+  #aiPanel{ --niveau-kleur:#f0c233; --niveau-gloed:rgba(240,194,51,.35); }
+  .ai-label{
+    text-align:center; font-size:11px; letter-spacing:1px; text-transform:uppercase;
+    opacity:.7; margin:18px 0 8px 0;
+  }
+  .ai-label.eerste{ margin-top:0; }
+  .ai-kleurkeuze{ display:flex; gap:10px; }
+  .ai-kleurknop{
+    flex:1; margin:0; padding:12px 6px; font-size:14px;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    background:rgba(0,0,0,.18); color:var(--cream); border:1px solid var(--line); border-radius:10px;
+  }
+  .ai-kleurknop:active{ transform:translateY(1px); }
+  .ai-kleurknop.gekozen{
+    background:rgba(190,159,65,.16); border-color:var(--gold); color:var(--gold);
+    box-shadow:inset 0 0 0 1px var(--gold);
+  }
+  .kleurstip{ width:14px; height:14px; border-radius:50%; border:1px solid var(--gold); flex-shrink:0; }
+  .kleurstip.red{ background:var(--red); }
+  .kleurstip.black{ background:#1a1a1a; }
+
+  /* De baan is één verloop van groen naar rood; rechts van de knop ligt er een donkere laag over, zodat
+     je ziet hoe ver je de moeilijkheid opdraait. --t (0 tot 1) is de stand. De knop is 24px breed en
+     zijn midden loopt dus van 12px tot de breedte min 12px. */
+  .niveau-slider input[type=range]{
+    --niveau-baan: linear-gradient(90deg, transparent calc(12px + (100% - 24px) * var(--t, .5)), rgba(0,0,0,.62) 0),
+                   linear-gradient(90deg, #4cc36f, #a6cf3f 25%, #f0c233 50%, #f08a32 75%, #e9483b);
+    -webkit-appearance:none; appearance:none; display:block; width:100%; height:26px; margin:0;
+    background:transparent; cursor:pointer;
+  }
+  .niveau-slider input[type=range]::-webkit-slider-runnable-track{
+    height:10px; border-radius:999px; background:var(--niveau-baan);
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.55), 0 0 0 1px rgba(242,234,217,.15);
+  }
+  .niveau-slider input[type=range]::-moz-range-track{
+    height:10px; border-radius:999px; background:var(--niveau-baan);
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.55), 0 0 0 1px rgba(242,234,217,.15);
+  }
+  .niveau-slider input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; box-sizing:border-box;
+    width:24px; height:24px; margin-top:-7px; border-radius:50%;
+    background:var(--niveau-kleur); border:3px solid var(--cream);
+    box-shadow:0 2px 6px rgba(0,0,0,.5), 0 0 14px var(--niveau-gloed);
+  }
+  .niveau-slider input[type=range]::-moz-range-thumb{
+    box-sizing:border-box; width:24px; height:24px; border-radius:50%;
+    background:var(--niveau-kleur); border:3px solid var(--cream);
+    box-shadow:0 2px 6px rgba(0,0,0,.5), 0 0 14px var(--niveau-gloed);
+  }
+  .niveau-slider input[type=range]:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; border-radius:999px; }
+  /* Vijf stipjes onder de baan, elk in de kleur van zijn stand en precies onder het midden van de knop. */
+  .niveau-streepjes{ display:flex; justify-content:space-between; }
+  .niveau-streepje{
+    width:24px; height:20px; min-height:0; margin:0; padding:0;
+    display:flex; align-items:center; justify-content:center;
+    background:transparent; border:none; box-shadow:none; cursor:pointer;
+  }
+  .niveau-streepje::before{
+    content:''; width:7px; height:7px; border-radius:50%;
+    background:var(--streep-kleur); opacity:.28; transition:transform .2s ease, opacity .2s ease;
+  }
+  .niveau-streepje.aan::before{ opacity:1; }
+  .niveau-streepje.huidig::before{ transform:scale(1.6); box-shadow:0 0 8px var(--streep-kleur); }
+  .niveau-uitersten{
+    display:flex; justify-content:space-between;
+    font-size:10px; font-weight:bold; letter-spacing:.5px; text-transform:uppercase;
+  }
+  .niveau-uitersten span:first-child{ color:#4cc36f; }
+  .niveau-uitersten span:last-child{ color:#e9483b; }
+
+  .ai-tegenstander-kaart{
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    margin:12px 0 0 0; padding:16px 14px 12px;
+    background:radial-gradient(ellipse 75% 65% at 50% 0%, var(--niveau-gloed), transparent 75%), rgba(0,0,0,.18);
+    border:1px solid var(--line); border-radius:12px;
+  }
+  .ai-avatar{
+    width:85px; height:85px; border-radius:50%; overflow:hidden; flex-shrink:0;
+    border:4px solid var(--niveau-kleur); background:#0b2a20;
+    box-shadow:0 4px 12px rgba(0,0,0,.45), 0 0 24px var(--niveau-gloed);
+    transition:border-color .25s ease, box-shadow .25s ease;
+  }
+  .ai-avatar svg, .ai-avatar-mini svg{ display:block; width:100%; height:100%; }
+  .ai-avatar.wissel{ animation:avatarWissel .32s ease-out; }
+  @keyframes avatarWissel{
+    0%{ transform:scale(.86); opacity:.4; }
+    60%{ transform:scale(1.05); opacity:1; }
+    100%{ transform:scale(1); }
+  }
+  .ai-naam{
+    margin-top:8px; font-family:'Trebuchet MS', Helvetica, sans-serif; font-size:20px; font-weight:bold;
+    letter-spacing:1px; color:var(--niveau-kleur); text-shadow:0 2px 4px rgba(0,0,0,.45);
+  }
+  .ai-graad{
+    margin-top:3px; padding:2px 9px; border-radius:999px;
+    font-size:9.5px; font-weight:bold; letter-spacing:.8px; text-transform:uppercase;
+    background:var(--niveau-kleur); color:#14110b;
+  }
+  .ai-uitleg{ margin-top:10px; max-width:340px; font-size:12.5px; line-height:1.5; opacity:.88; }
+
+  /* In het spel: het fototje van de tegenstander onder "... aan zet". Is de bot aan zet, dan pulseert
+     het zachtjes, zodat je ziet dat hij nadenkt. */
+  .ai-tegenstander{ display:flex; align-items:center; gap:7px; margin:3px 0 4px 0; font-size:11px; }
+  .ai-avatar-mini{
+    width:20px; height:20px; border-radius:50%; overflow:hidden; flex-shrink:0;
+    border:2px solid var(--niveau-kleur); box-shadow:0 0 8px var(--niveau-gloed);
+  }
+  .ai-tegenstander b{ color:var(--niveau-kleur); font-size:12.5px; }
+  .ai-tegenstander .graad{ opacity:.7; }
+  .ai-tegenstander .denkt-tekst{ margin-left:3px; font-style:italic; opacity:.6; }
+  .ai-tegenstander:not(.denkt) .denkt-tekst{ display:none; }
+  .ai-tegenstander.denkt .ai-avatar-mini{ animation:aiDenkt 1.4s ease-out infinite; }
+  @keyframes aiDenkt{
+    0%{ box-shadow:0 0 0 0 var(--niveau-kleur); }
+    70%, 100%{ box-shadow:0 0 0 7px transparent; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .ai-avatar.wissel, .ai-tegenstander.denkt .ai-avatar-mini{ animation:none; }
+  }
+
   /* Kop met een kleine terugknop linksboven. Alleen het designpaneel gebruikt dit: die lijst is
      lang, en een terugknop onderaan betekende eerst helemaal naar beneden scrollen om weg te
      kunnen. De knop ligt absoluut over de titelregel, zodat de titel gewoon in het midden van het
      paneel blijft staan in plaats van opzij geduwd te worden. */
   .subpanel-kop{ position:relative; }
   .subpanel-terug{
-    position:absolute; left:-6px; top:-7px; z-index:1;
-    margin:0; padding:10px 12px; min-height:0;
-    background:transparent; border:none; box-shadow:none;
-    color:var(--gold); opacity:.6; font-size:12px; font-weight:bold; line-height:1;
+    position:absolute; left:0; top:-5px; z-index:1;
+    margin:0; padding:5px 10px; min-height:0;
+    background:rgba(0,0,0,.2); border:1px solid rgba(190,159,65,.6); border-radius:999px; box-shadow:none;
+    color:var(--gold); font-size:12px; font-weight:bold; line-height:1;
     letter-spacing:.5px;
   }
-  .subpanel-terug:active{ opacity:1; }
+  .subpanel-terug:active{ background:rgba(190,159,65,.18); transform:translateY(1px); }
 
   /* Schuifknop voor de rustige tafel. De <input> zelf is onzichtbaar maar blijft in de tab-volgorde
      staan, zodat toetsenbord en voorleessoftware er gewoon bij kunnen; .schuif tekent wat je ziet. */
@@ -528,13 +651,26 @@
     <button class="secondary subpanel-back" onclick="openMenuPanel(null)">← Terug</button>
   </div>
 
-  <div id="aiColorPanel" class="menu-subpanel" style="display:none;">
+  <div id="aiPanel" class="menu-subpanel" style="display:none;">
     <div class="subpanel-title">🤖 Tegen AI</div>
-    <div class="status-line" style="text-align:center; margin-top:0;">Kies je kleur:</div>
-    <div class="btn-row">
-      <button onclick="startVsAI('red')">🔴 Rood</button>
-      <button onclick="startVsAI('black')">⚫ Zwart</button>
+    <div class="ai-label eerste">Jouw kleur</div>
+    <div class="ai-kleurkeuze" role="radiogroup" aria-label="Jouw kleur">
+      <button type="button" class="ai-kleurknop" data-kleur="red" role="radio" onclick="kiesAiKleur('red')"><span class="kleurstip red"></span>Rood</button>
+      <button type="button" class="ai-kleurknop" data-kleur="black" role="radio" onclick="kiesAiKleur('black')"><span class="kleurstip black"></span>Zwart</button>
     </div>
+    <div class="ai-label">Jouw tegenstander</div>
+    <div class="niveau-slider">
+      <input type="range" id="aiNiveauSlider" min="1" max="5" step="1" value="3" aria-label="Moeilijkheid" oninput="kiesAiNiveau(this.value)">
+      <div class="niveau-streepjes" id="aiNiveauStreepjes"></div>
+      <div class="niveau-uitersten"><span>Makkelijk</span><span>Moeilijk</span></div>
+    </div>
+    <div class="ai-tegenstander-kaart">
+      <div class="ai-avatar" id="aiAvatar"></div>
+      <div class="ai-naam" id="aiNaam"></div>
+      <div class="ai-graad" id="aiGraad"></div>
+      <div class="ai-uitleg" id="aiUitleg" aria-live="polite"></div>
+    </div>
+    <button class="subpanel-primary" id="aiStartKnop" onclick="startVsAI()">Spelen</button>
     <button class="secondary subpanel-back" onclick="openMenuPanel('solo')">← Terug</button>
   </div>
 </div>
@@ -542,6 +678,7 @@
 
 <div class="panel" id="gamePanel" style="display:none;">
   <div id="turnIndicator" class="turn-indicator"></div>
+  <div id="aiTegenstander" class="ai-tegenstander" style="display:none;"></div>
   <div id="winnerBanner"></div>
 
   <div class="board-row">
@@ -1942,7 +2079,7 @@ async function joinRoom(){
 // Het menu toont maar één niveau tegelijk: een subpaneel VERVANGT de hoofdknoppen i.p.v. eronder
 // te verschijnen terwijl de aangeklikte knop bleef staan (dat las verwarrend). `null` = terug naar
 // de hoofdknoppen. Elk subpaneel heeft daarvoor zelf een "← Terug"-knop.
-const MENU_PANELS = { multiplayer:'multiplayerPanel', solo:'soloPanel', ai:'aiColorPanel', skins:'skinPanel' };
+const MENU_PANELS = { multiplayer:'multiplayerPanel', solo:'soloPanel', ai:'aiPanel', skins:'skinPanel' };
 
 function openMenuPanel(name){
   Object.values(MENU_PANELS).forEach(id => {
@@ -1953,6 +2090,7 @@ function openMenuPanel(name){
   if(name && MENU_PANELS[name]) document.getElementById(MENU_PANELS[name]).style.display = 'block';
   if(name !== 'multiplayer') document.getElementById('lobbyMsg').textContent = '';
   if(name === 'skins') renderSkinLijst();
+  if(name === 'ai') renderAiKeuze(false);
 }
 
 /** Tekent de keuzelijst. Elke rij toont echte kaartjes in dát design: de variabelen worden op de
@@ -2038,7 +2176,119 @@ function startSolo(){
   renderAll();
 }
 
-function startVsAI(humanColor){
+/* ======================= TEGEN AI: KLEUR EN TEGENSTANDER KIEZEN ======================= */
+// De keuze blijft op dit toestel bewaard, zodat je de volgende keer meteen weer met dezelfde kleur tegen
+// hetzelfde mannetje staat. Wie het paneel nog nooit opende, begint in het midden, bij Robert.
+const AI_KEUZE_OPSLAG = 'baarden:aiKeuze';
+let aiKeuze = null;
+
+function laadAiKeuze(){
+  const keuze = { kleur:'red', niveau:3 };
+  try{
+    const opgeslagen = JSON.parse(localStorage.getItem(AI_KEUZE_OPSLAG) || 'null');
+    if(opgeslagen && (opgeslagen.kleur==='red' || opgeslagen.kleur==='black')) keuze.kleur = opgeslagen.kleur;
+    const niveau = opgeslagen ? parseInt(opgeslagen.niveau, 10) : NaN;
+    if(niveau>=1 && niveau<=AI_TEGENSTANDERS.length) keuze.niveau = niveau;
+  }catch(e){}
+  return keuze;
+}
+
+function bewaarAiKeuze(){
+  try { localStorage.setItem(AI_KEUZE_OPSLAG, JSON.stringify(aiKeuze)); } catch(e){}
+}
+
+function kiesAiKleur(kleur){
+  aiKeuze.kleur = kleur;
+  bewaarAiKeuze();
+  renderAiKeuze(false);
+}
+
+function kiesAiNiveau(niveau){
+  const n = Math.min(AI_TEGENSTANDERS.length, Math.max(1, parseInt(niveau, 10) || 1));
+  if(n === aiKeuze.niveau) return;
+  aiKeuze.niveau = n;
+  bewaarAiKeuze();
+  renderAiKeuze(true);
+}
+
+function zetNiveauKleuren(el, tegenstander){
+  el.style.setProperty('--niveau-kleur', tegenstander.kleur);
+  el.style.setProperty('--niveau-gloed', tegenstander.gloed);
+}
+
+// gewisseld=true laat het mannetje even opveren, zodat je merkt dat er een ander tegenover je zit.
+function renderAiKeuze(gewisseld){
+  if(!aiKeuze) aiKeuze = laadAiKeuze();
+  const paneel = document.getElementById('aiPanel');
+  const t = AI_TEGENSTANDERS[aiKeuze.niveau-1];
+  zetNiveauKleuren(paneel, t);
+
+  paneel.querySelectorAll('.ai-kleurknop').forEach(knop=>{
+    const gekozen = knop.dataset.kleur === aiKeuze.kleur;
+    knop.classList.toggle('gekozen', gekozen);
+    knop.setAttribute('aria-checked', gekozen ? 'true' : 'false');
+  });
+
+  const slider = document.getElementById('aiNiveauSlider');
+  slider.max = AI_TEGENSTANDERS.length;
+  slider.value = aiKeuze.niveau;
+  slider.style.setProperty('--t', (aiKeuze.niveau-1) / (AI_TEGENSTANDERS.length-1));
+  slider.setAttribute('aria-valuetext', `${t.naam}, ${t.graad.toLowerCase()}`);
+
+  // De stipjes zijn een groter tikdoel dan de smalle baan. De slider zelf blijft het toetsenbord-
+  // element, dus de stipjes staan niet in de tab-volgorde.
+  const streepjes = document.getElementById('aiNiveauStreepjes');
+  if(!streepjes.children.length){
+    AI_TEGENSTANDERS.forEach(o=>{
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'niveau-streepje';
+      b.tabIndex = -1;
+      b.style.setProperty('--streep-kleur', o.kleur);
+      b.setAttribute('aria-label', `${o.naam} (${o.graad.toLowerCase()})`);
+      b.onclick = () => kiesAiNiveau(o.niveau);
+      streepjes.appendChild(b);
+    });
+  }
+  Array.from(streepjes.children).forEach((b, i)=>{
+    b.classList.toggle('aan', i < aiKeuze.niveau);
+    b.classList.toggle('huidig', i === aiKeuze.niveau-1);
+  });
+
+  const avatar = document.getElementById('aiAvatar');
+  avatar.innerHTML = t.gezicht;
+  if(gewisseld){
+    avatar.classList.remove('wissel');
+    void avatar.offsetWidth; // herstart de animatie ook als je snel verder schuift
+    avatar.classList.add('wissel');
+  }
+  document.getElementById('aiNaam').textContent = t.naam;
+  document.getElementById('aiGraad').textContent = t.graad;
+  document.getElementById('aiUitleg').textContent = t.uitleg;
+  document.getElementById('aiStartKnop').textContent = `Speel tegen ${t.naam}`;
+}
+
+// In het spel staat onder "... aan zet" het gezicht van de tegenstander, zodat je altijd ziet tegen wie
+// (en dus op welk niveau) je speelt.
+function renderAiTegenstander(){
+  const el = document.getElementById('aiTegenstander');
+  if(!el) return;
+  if(!aiMode){ el.style.display = 'none'; return; }
+  const t = aiTegenstander();
+  if(el.dataset.niveau !== String(t.niveau)){
+    el.dataset.niveau = String(t.niveau);
+    zetNiveauKleuren(el, t);
+    el.innerHTML = `<span class="ai-avatar-mini">${t.gezicht}</span>` +
+      `<span><b>${t.naam}</b> <span class="graad">· ${t.graad}</span><span class="denkt-tekst">denkt na…</span></span>`;
+  }
+  el.classList.toggle('denkt', !state.winner && state.turn === aiColor);
+  el.style.display = 'flex';
+}
+
+function startVsAI(){
+  if(!aiKeuze) aiKeuze = laadAiKeuze();
+  const humanColor = aiKeuze.kleur;
+  aiNiveau = aiKeuze.niveau;
   aiMode = true;
   showConnectionStatus(false);
   soloMode = false;
@@ -2914,7 +3164,136 @@ function attemptMove(color, srcCell, destCell){
 // Gewichten van de heuristische evaluatiefunctie. Kunnen verbeterd worden door het losse
 // trainingsscript (baarden-train.js) lokaal te laten draaien — kopieer de uitkomst hierin.
 let AI_WEIGHTS = { towerDiff:111.70481965674506, ownCardVal:0.05, oppCardVal:0.10356158334450093, ownAdvance:0.9995500917448126, oppThreat:0.1291231743405385, blockBonus:0.19230643261433683 }; // getraind via baarden-train.js
-const AI_SEARCH_DEPTH = 4; // aantal zetten (plies) vooruitkijken tijdens de bewegingsfase
+const AI_SEARCH_DEPTH = 4; // aantal zetten (plies) vooruitkijken tijdens de bewegingsfase, op volle sterkte
+
+/* ---------- Moeilijkheid: vijf tegenstanders ---------- */
+// Tegen AI kies je een tegenstander. Achter elk mannetje zit dezelfde bot, met twee knoppen:
+//  - diepte:   hoeveel zetten hij vooruitkijkt (in plaats van AI_SEARCH_DEPTH);
+//  - foutkans: de kans dat hij een beurt zomaar een willekeurige zet doet in plaats van de beste.
+// Stefaan speelt op volle sterkte, exact zoals de bot voor er niveaus waren. Komt er later een andere bot
+// (bv. de RL-bot), dan blijven naam, gezicht en uitleg staan en verandert enkel wat diepte en foutkans betekenen.
+function aiGezicht(achtergrond, tekening){
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">` +
+    `<rect width="100" height="100" fill="${achtergrond}"/><circle cx="50" cy="44" r="36" fill="#fff" opacity=".06"/>${tekening}</svg>`;
+}
+// Bewust geen verlopen of id's in de tekeningen: hetzelfde gezicht staat soms twee keer op de pagina (menu en
+// spel), en een verwijzing naar een id in een verborgen menu tekent in sommige browsers niets.
+const AI_TEGENSTANDERS = [
+  { niveau:1, naam:'Bob', graad:'Makkelijk', kleur:'#4cc36f', gloed:'rgba(76,195,111,.35)', diepte:1, foutkans:0.35,
+    uitleg:'Bob speelt nog maar net. Hij kijkt niet verder dan zijn eigen zet en doet vaak maar wat. Ideaal om het spel te leren.',
+    // Jong, propellerpetje, drie haartjes op de kin.
+    gezicht: aiGezicht('#1d5234',
+      '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#4cc36f"/>' +
+      '<path d="M40 75Q50 84 60 75" fill="none" stroke="#2f8a4c" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<rect x="44" y="64" width="12" height="12" rx="4" fill="#e3ab85"/>' +
+      '<circle cx="29" cy="51" r="5" fill="#f1c7a1"/><circle cx="71" cy="51" r="5" fill="#f1c7a1"/>' +
+      '<ellipse cx="50" cy="50" rx="21" ry="23" fill="#f1c7a1"/>' +
+      '<path d="M29.5 39L33 47.5 35.5 39ZM70.5 39L67 47.5 64.5 39Z" fill="#d9772f"/>' +
+      '<path d="M28 39C28 20 72 20 72 39Z" fill="#f2c230"/>' +
+      '<path d="M45 22.5C48 21.6 52 21.6 55 22.5L57 39H43Z" fill="#e84c3d"/>' +
+      '<rect x="26" y="36" width="48" height="5" rx="2.5" fill="#3b7dd8"/>' +
+      '<path d="M50 22V14" stroke="#333" stroke-width="1.6"/>' +
+      '<ellipse cx="42" cy="13" rx="8" ry="2.4" fill="#3b7dd8"/><ellipse cx="58" cy="13" rx="8" ry="2.4" fill="#e84c3d"/>' +
+      '<circle cx="50" cy="13.5" r="2" fill="#333"/>' +
+      '<path d="M37 45.5Q42 42.5 46 45.5M54 45.5Q58 42.5 63 45.5" fill="none" stroke="#c0692a" stroke-width="2" stroke-linecap="round"/>' +
+      '<circle cx="42" cy="50.5" r="4.6" fill="#fff"/><circle cx="58" cy="50.5" r="4.6" fill="#fff"/>' +
+      '<circle cx="42.6" cy="51" r="2.6" fill="#2b1d14"/><circle cx="58.6" cy="51" r="2.6" fill="#2b1d14"/>' +
+      '<circle cx="43.4" cy="50" r=".9" fill="#fff"/><circle cx="59.4" cy="50" r=".9" fill="#fff"/>' +
+      '<circle cx="35" cy="58.5" r="3.8" fill="#f08c7e" opacity=".55"/><circle cx="65" cy="58.5" r="3.8" fill="#f08c7e" opacity=".55"/>' +
+      '<ellipse cx="50" cy="56.5" rx="2.4" ry="1.8" fill="#e0a07a"/>' +
+      '<path d="M41 61Q50 72 59 61Z" fill="#7a2a22"/><path d="M42.5 61.5H57.5Q56.5 64 50 64T42.5 61.5Z" fill="#fff"/>' +
+      '<path d="M47 70.5L46.5 73M50 71V73.8M53 70.5L53.5 73" stroke="#9b5a2e" stroke-width="1.2" stroke-linecap="round"/>') },
+  { niveau:2, naam:'George', graad:'Vrij makkelijk', kleur:'#a6cf3f', gloed:'rgba(166,207,63,.35)', diepte:2, foutkans:0.2,
+    uitleg:'George ziet wat jij kan terugdoen, maar denkt niet verder vooruit en laat geregeld een kans liggen.',
+    // Brilletje, polo, stoppelbaardje.
+    gezicht: aiGezicht('#3d5418',
+      '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#a6cf3f"/>' +
+      '<path d="M40 74L50 84 60 74 55 73 50 78 45 73Z" fill="#7fa62a"/>' +
+      '<rect x="44" y="64" width="12" height="12" rx="4" fill="#d49a70"/>' +
+      '<circle cx="29" cy="49" r="5" fill="#e8b48c"/><circle cx="71" cy="49" r="5" fill="#e8b48c"/>' +
+      '<ellipse cx="50" cy="48" rx="21" ry="24" fill="#e8b48c"/>' +
+      '<path d="M29 46C26 28 38 20 51 20S75 29 71 46C70 38 66 33 58 31 50 34 40 34 33 36 31 39 30 42 29 46Z" fill="#6b4428"/>' +
+      '<path d="M29.5 50C30 64 38 74 50 74S70 64 70.5 50C69 57 66 61 61 62 57 59 43 59 39 62 34 61 31 57 29.5 50Z" fill="#6b4428" opacity=".45"/>' +
+      '<path d="M42 61.5C45 58.5 48 59 50 60 52 59 55 58.5 58 61.5 55 61 52 61.5 50 61.5S45 61 42 61.5Z" fill="#5a3820"/>' +
+      '<path d="M44.5 65Q50 68.5 55.5 65" fill="none" stroke="#6a2d22" stroke-width="1.8" stroke-linecap="round"/>' +
+      '<path d="M36 40.5L46 40M54 40L64 40.5" stroke="#5a3820" stroke-width="2.4" stroke-linecap="round"/>' +
+      '<circle cx="42" cy="47" r="2.4" fill="#2b1d14"/><circle cx="58" cy="47" r="2.4" fill="#2b1d14"/>' +
+      '<circle cx="42" cy="47" r="6.2" fill="#fff" fill-opacity=".12" stroke="#2a2a2a" stroke-width="1.8"/>' +
+      '<circle cx="58" cy="47" r="6.2" fill="#fff" fill-opacity=".12" stroke="#2a2a2a" stroke-width="1.8"/>' +
+      '<path d="M48 46Q50 44.5 52 46M35.8 46L30 44.5M64.2 46L70 44.5" fill="none" stroke="#2a2a2a" stroke-width="1.6" stroke-linecap="round"/>' +
+      '<path d="M50 50Q47.5 55 50 55.5" fill="none" stroke="#c98a60" stroke-width="1.6" stroke-linecap="round"/>') },
+  { niveau:3, naam:'Robert', graad:'Gemiddeld', kleur:'#f0c233', gloed:'rgba(240,194,51,.35)', diepte:3, foutkans:0.1,
+    uitleg:'Robert denkt een paar zetten vooruit en vergist zich af en toe. Een eerlijke partij.',
+    // Houthakkershemd en een volle bruine baard.
+    gezicht: aiGezicht('#574512',
+      '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#a8402c"/>' +
+      '<path d="M26 80V100M38 75V100M62 75V100M74 80V100M16 90H84" stroke="#7d2d1f" stroke-width="2.4"/>' +
+      '<circle cx="29" cy="48" r="5" fill="#d9a07a"/><circle cx="71" cy="48" r="5" fill="#d9a07a"/>' +
+      '<ellipse cx="50" cy="48" rx="21" ry="24" fill="#d9a07a"/>' +
+      '<path d="M28 48C24 26 38 17 51 18S77 28 72 48C71 40 69 34 64 31 56 29 44 29 36 31 31 35 29 41 28 48Z" fill="#5a3a22"/>' +
+      '<path d="M36 31C42 24 56 23 64 31 56 28 46 29 36 31Z" fill="#4a2e1a"/>' +
+      '<path d="M28.5 47C27 70 36 88 50 90S73 70 71.5 47C70 56 66 62 60 64 56 61 44 61 40 64 34 62 30 56 28.5 47Z" fill="#5a3a22"/>' +
+      '<path d="M42 76Q44 82 46 85M50 78V88M58 76Q56 82 54 85" fill="none" stroke="#4a2e1a" stroke-width="1.4" stroke-linecap="round"/>' +
+      '<ellipse cx="50" cy="67.5" rx="4" ry="1.6" fill="#b86a55"/>' +
+      '<path d="M39 64C43 58.5 47 59 50 61 53 59 57 58.5 61 64 57 64.5 53 63.5 50 63.5S43 64.5 39 64Z" fill="#4a2e1a"/>' +
+      '<path d="M36 40.5L46.5 42.5M53.5 42.5L64 40.5" stroke="#4a2e1a" stroke-width="3" stroke-linecap="round"/>' +
+      '<circle cx="42" cy="47.5" r="2.6" fill="#1e140e"/><circle cx="58" cy="47.5" r="2.6" fill="#1e140e"/>' +
+      '<circle cx="42.8" cy="46.8" r=".8" fill="#fff"/><circle cx="58.8" cy="46.8" r=".8" fill="#fff"/>' +
+      '<path d="M49 49Q46 56 50 57T51 49Z" fill="#c28560"/>') },
+  { niveau:4, naam:'Ferdinand', graad:'Moeilijk', kleur:'#f08a32', gloed:'rgba(240,138,50,.35)', diepte:AI_SEARCH_DEPTH, foutkans:0.05,
+    uitleg:'Ferdinand denkt even ver vooruit als Stefaan. Heel af en toe laat hij een steek vallen: grijp die kans.',
+    // Kostuum, strikje, monocle, krulsnor en een spitse grijze baard.
+    gezicht: aiGezicht('#5a3014',
+      '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#2b2b36"/>' +
+      '<rect x="44" y="63" width="12" height="12" rx="4" fill="#dcae8a"/>' +
+      '<path d="M41 74L50 100 59 74Z" fill="#f2ead9"/>' +
+      '<path d="M41 74L50 100H45L36 77ZM59 74L50 100H55L64 77Z" fill="#1d1d26"/>' +
+      '<path d="M50 78L40 73V83ZM50 78L60 73V83Z" fill="#f08a32"/><circle cx="50" cy="78" r="2.6" fill="#c96a1c"/>' +
+      '<circle cx="29" cy="48" r="5" fill="#f0c9a8"/><circle cx="71" cy="48" r="5" fill="#f0c9a8"/>' +
+      '<ellipse cx="50" cy="47" rx="21" ry="24" fill="#f0c9a8"/>' +
+      '<ellipse cx="42" cy="30" rx="6" ry="3" fill="#fff" opacity=".35" transform="rotate(-20 42 30)"/>' +
+      '<path d="M28.5 50C26 42 27 36 31 32 31 38 33 42 35 44 32 45 30 47 28.5 50ZM71.5 50C74 42 73 36 69 32 69 38 67 42 65 44 68 45 70 47 71.5 50Z" fill="#b8b8b8"/>' +
+      '<path d="M36 42H46.5" stroke="#9a9a9a" stroke-width="2.6" stroke-linecap="round"/>' +
+      '<path d="M53 40Q59 34.5 65 38.5" fill="none" stroke="#9a9a9a" stroke-width="2.6" stroke-linecap="round"/>' +
+      '<ellipse cx="42" cy="47.5" rx="2.6" ry="1.5" fill="#1e140e"/>' +
+      '<circle cx="58.5" cy="47" r="2.7" fill="#1e140e"/><circle cx="59.3" cy="46.2" r=".8" fill="#fff"/>' +
+      '<path d="M49 48Q45.5 57 50 58T51 48Z" fill="#dcae8a"/>' +
+      '<path d="M33 57C34 72 42 84 50 97 58 84 66 72 67 57 63 63 57 70 50 70S37 63 33 57Z" fill="#a9a9a9"/>' +
+      '<path d="M46 73Q48 83 50 92M54 73Q52 81 51 86" fill="none" stroke="#d4d4d4" stroke-width="1.4" stroke-linecap="round"/>' +
+      '<path d="M46 67.5Q51 69.5 55.5 66.5" fill="none" stroke="#7a3a2c" stroke-width="1.6" stroke-linecap="round"/>' +
+      '<path d="M50 60.5C46 57 40 57.5 36.5 60.5 34 62.5 30.5 61.5 30.5 57.5 28.5 62.5 32.5 66.5 38 64.5 43 63 47 63 50 63S57 63 62 64.5C67.5 66.5 71.5 62.5 69.5 57.5 69.5 61.5 66 62.5 63.5 60.5 60 57.5 54 57 50 60.5Z" fill="#c4c4c4" stroke="#8d8d8d" stroke-width=".6"/>' +
+      '<circle cx="58.5" cy="47" r="7" fill="#fff" fill-opacity=".15" stroke="#d9b44a" stroke-width="2"/>' +
+      '<path d="M64.5 51C70 58 66 68 72 80" fill="none" stroke="#d9b44a" stroke-width="1.1"/>') },
+  { niveau:5, naam:'Stefaan', graad:'Heel moeilijk', kleur:'#e9483b', gloed:'rgba(233,72,59,.38)', diepte:AI_SEARCH_DEPTH, foutkans:0,
+    uitleg:'Stefaan maakt geen fouten en speelt altijd de sterkste zet die hij vindt. Wie hem verslaat, mag trots zijn baard laten staan.',
+    // De koning van de baarden: kroon, borstelige wenkbrauwen en een witte baard tot op de grond.
+    gezicht: aiGezicht('#561816',
+      '<path d="M10 100C12 80 30 72 50 72S88 80 90 100Z" fill="#3b1420"/>' +
+      '<path d="M30 78L40 100M70 78L60 100" stroke="#d9b44a" stroke-width="3"/>' +
+      '<path d="M27 40C20 60 22 84 17 100H33C31 80 30 62 33 46ZM73 40C80 60 78 84 83 100H67C69 80 70 62 67 46Z" fill="#e4e4e4"/>' +
+      '<ellipse cx="50" cy="48" rx="21" ry="24" fill="#e6b996"/>' +
+      '<path d="M29 44C28 30 38 26 50 26S72 30 71 44C66 36 58 34 50 34S34 36 29 44Z" fill="#f0f0f0"/>' +
+      '<path d="M30 32V15L39.5 24 50 11 60.5 24 70 15V32Z" fill="#d9b44a" stroke="#a8842e" stroke-width="1.2" stroke-linejoin="round"/>' +
+      '<rect x="29" y="29" width="42" height="5" rx="1.5" fill="#c29a36"/>' +
+      '<circle cx="50" cy="21" r="2.6" fill="#e9483b"/><circle cx="40" cy="31.5" r="1.7" fill="#3b7dd8"/><circle cx="60" cy="31.5" r="1.7" fill="#3b7dd8"/>' +
+      '<path d="M31 39C37 35 44 37 48.5 43.5 43 42.5 37 42 31 43.5ZM69 39C63 35 56 37 51.5 43.5 57 42.5 63 42 69 43.5Z" fill="#f4f4f4" stroke="#bdbdbd" stroke-width=".6"/>' +
+      '<ellipse cx="42" cy="47.5" rx="3" ry="1.7" fill="#1a1010"/><ellipse cx="58" cy="47.5" rx="3" ry="1.7" fill="#1a1010"/>' +
+      '<circle cx="43" cy="47" r=".7" fill="#fff"/><circle cx="59" cy="47" r=".7" fill="#fff"/>' +
+      '<path d="M48.5 48Q45 57.5 50 59T51.5 48Z" fill="#cf9d78"/>' +
+      '<path d="M23 48C20 74 30 94 38 100H62C70 94 80 74 77 48 73 59 65 64 58 64.5 54 62 46 62 42 64.5 35 64 27 59 23 48Z" fill="#eee"/>' +
+      '<path d="M36 72Q38 86 41 98M44 70Q45 84 47 99M50 72V99M56 70Q55 84 53 99M64 72Q62 86 59 98" fill="none" stroke="#c9c9c9" stroke-width="1.3" stroke-linecap="round"/>' +
+      '<path d="M50 60C44 56 35 57.5 30 67 37 62.5 44 63.5 50 63.5S63 62.5 70 67C65 57.5 56 56 50 60Z" fill="#fafafa" stroke="#c9c9c9" stroke-width=".6"/>') },
+];
+// Standaard volle sterkte. Het menu zet dit bij de start van een partij; baarden-vergelijk.js doorloopt geen
+// menu en test zo altijd de sterkste bot, zonder extra toevalsgetallen die het schudden zouden verschuiven.
+let aiNiveau = AI_TEGENSTANDERS.length;
+function aiTegenstander(){ return AI_TEGENSTANDERS[aiNiveau-1] || AI_TEGENSTANDERS[AI_TEGENSTANDERS.length-1]; }
+function aiZoekdiepte(){ return aiTegenstander().diepte; }
+function aiMaaktFout(){
+  const kans = aiTegenstander().foutkans;
+  return kans > 0 && Math.random() < kans;
+}
+function willekeurigUit(lijst){ return lijst.length ? lijst[Math.floor(Math.random()*lijst.length)] : null; }
 
 // Een geblokkeerde kaart telt nergens mee in de waardering (er wordt enkel naar de bovenste kaart
 // van een vakje gekeken). Daardoor was het verleggen van de blok-kaart bijna gratis: de AI raakte
@@ -3121,8 +3500,8 @@ function minimaxSearch(board, depth, maxColor, starter, phaseIndex, alpha, beta,
     } else {
       const sim = simulateMove(board, curColor, mv.src, mv.dest);
       if(!sim) continue;
-      if(sim.winner===maxColor) score = 1e6 - (AI_SEARCH_DEPTH-depth);
-      else if(sim.winner) score = -1e6 + (AI_SEARCH_DEPTH-depth);
+      if(sim.winner===maxColor) score = 1e6 - (aiZoekdiepte()-depth);
+      else if(sim.winner) score = -1e6 + (aiZoekdiepte()-depth);
       else score = minimaxSearch(sim.board, depth-1, maxColor, nextState.starter, nextState.phaseIndex, alpha, beta, oppBlok).score;
     }
     if(maximizing){
@@ -3209,7 +3588,7 @@ function chooseBestMoveCautiously(board, maxColor, starter, phaseIndex){
     let score;
     if(sim.winner===maxColor) score = 1e6;
     else if(sim.winner) score = -1e6;
-    else score = minimaxSearch(sim.board, AI_SEARCH_DEPTH-1, maxColor, nextState.starter, nextState.phaseIndex, -Infinity, Infinity).score;
+    else score = minimaxSearch(sim.board, aiZoekdiepte()-1, maxColor, nextState.starter, nextState.phaseIndex, -Infinity, Infinity).score;
     if(!sim.winner && endsInRepetitionDraw(sim.board, curColor, 'move')) score = AI_DRAW_SCORE;
     // Veldnaam `move`, net als de lege uitkomsten hierboven en hieronder: aiDoMovePhase leest
     // moveResult.move. Met `mv` was dat altijd leeg, waardoor de bot nooit een gewone kaart
@@ -3280,7 +3659,7 @@ function bestBlockOption(board, color, starter, phaseIndex){
     const nb = simulateBlockPlacement(board, color, target);
     const gelijkspel = endsInRepetitionDraw(nb, color, 'move');
     const contScore = gelijkspel ? AI_DRAW_SCORE
-      : minimaxSearch(nb, Math.max(0,AI_SEARCH_DEPTH-1), color, nextState.starter, nextState.phaseIndex, -Infinity, Infinity).score;
+      : minimaxSearch(nb, Math.max(0,aiZoekdiepte()-1), color, nextState.starter, nextState.phaseIndex, -Infinity, Infinity).score;
     if(contScore > bestScore){ bestScore = contScore; best = target; bestIsGelijkspel = gelijkspel; }
   });
   if(best===null) return null;
@@ -3439,6 +3818,12 @@ async function aiDoPlacePhase(){
       if(sc > best.score) best = {soort:'hold', idx, score:sc};
     }
   });
+  // Een zwakkere tegenstander (zie AI_TEGENSTANDERS) legt soms zomaar iets, of past zomaar.
+  if(aiMaaktFout()){
+    const opties = [{soort:'pas'}];
+    state.hand[color].forEach((card, idx)=> freeCells.forEach(cell=> opties.push({soort:'veld', idx, cell})));
+    best = willekeurigUit(opties);
+  }
   if(best.soort==='pas'){ await passPlace(); return; }
   state.selected = {idx:best.idx, card:state.hand[color][best.idx]};
   if(best.soort==='hold') await placeInHold();
@@ -3456,8 +3841,10 @@ async function aiDoMovePhase(){
     return;
   }
   const phaseIndex = (state.turn === state.starter) ? 0 : 1;
-  const moveResult = chooseBestMoveCautiously(state.board, color, state.starter, phaseIndex);
-  const blockOption = bestBlockOption(state.board, color, state.starter, phaseIndex);
+  // Een zwakkere tegenstander (zie AI_TEGENSTANDERS) schuift soms zomaar een kaart, zonder na te denken.
+  const foutZet = aiMaaktFout() ? willekeurigUit(getLegalNormalMoves(state.board, color)) : null;
+  const moveResult = foutZet ? {move: foutZet, score: 0} : chooseBestMoveCautiously(state.board, color, state.starter, phaseIndex);
+  const blockOption = foutZet ? null : bestBlockOption(state.board, color, state.starter, phaseIndex);
 
   // Bevestigd: vergelijk de blok-kaart als volwaardig alternatief t.o.v. de beste gewone zet,
   // i.p.v. hem enkel als noodgreep te gebruiken wanneer er toevallig geen andere zet meer is.
@@ -3641,6 +4028,7 @@ function renderAll(){
   document.getElementById('turnIndicator').innerHTML = state.winner ? '' :
     `<span class="dot ${state.turn}"></span>${label(state.turn)} aan zet` +
     (herhaling===2 ? `<span class="herhaling" title="Deze stelling kwam al 2 keer voor. Komt ze nog een keer, dan eindigt het spel in een gelijkspel.">↻ 2× dezelfde stelling</span>` : '');
+  renderAiTegenstander();
 
   document.getElementById('winnerBanner').innerHTML = !state.winner ? ''
     : state.winner==='draw'
