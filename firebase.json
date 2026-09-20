@@ -4,13 +4,30 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "js/baarden_proef.json",
+      "js/baarden_stellingen.json",
+      "js/baarden_acties.json",
+      "js/baarden_stefaanzetten.json",
+      "js/LEESMIJ.txt"
     ],
     "headers": [
       {
         "source": "**/*.@(js|html)",
         "headers": [
-          { "key": "Cache-Control", "value": "no-cache" }
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "**/baarden_net.json",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=86400"
+          }
         ]
       }
     ]

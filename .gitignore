@@ -1,1 +1,25 @@
+# Wat hier staat, blijft gewoon op je schijf maar gaat niet mee naar GitHub.
+
 .firebase/
+
+# Programmatuur van anderen. Wordt opgehaald met "npm install", hoort niet in de opslag.
+node_modules/
+
+# Je Python-trainingswerk voor de bot. Tientallen megabytes aan netwerken, checkpoints en
+# meetgegevens — dat hoort niet bij de website. Het blijft staan waar het staat.
+/RL/
+
+# Een oude kopie van het spel, met "niet gebruiken" in de naam.
+/_archief/
+
+# Werkmap met testscripts en een oudere kopie van de botbestanden. De website gebruikt
+# public/js/, niet deze map.
+/js/
+
+# Bronbestanden van de kaartontwerpen.
+*.zip
+
+# Tijdelijke uitvoer van Firebase en de editor.
+*.log
+.DS_Store
+Thumbs.db

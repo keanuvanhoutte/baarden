@@ -1,0 +1,36 @@
+WAT HIER WEL EN NIET MAG STAAN
+==============================
+
+Alles onder public/ gaat mee bij een deploy. Deze map is dus geen werkmap.
+
+HOORT HIER (en wordt gedeployd):
+  baarden_net.js        het netwerk uitrekenen in de browser
+  baarden_net.json      de gewichten zelf, 1,8 MB
+  baarden_bot.js        zetkeuze van de RL-bot
+  baarden_toestand.js   stelling -> toestandsvector
+  baarden_acties.js     actienummer -> zet
+  baarden_zoek.js       vooruitkijken met het netwerk
+
+  Deze zes worden pas gebruikt zodra een trap in index.html `rlBot: true`
+  krijgt. Sinds 18-09 staat dat nergens aan: alle vijf de tegenstanders spelen
+  weer met de oude zoeker. De bestanden blijven staan omdat Bob en George er
+  nog op kunnen komen zodra hun temperatuur geijkt is (RL/trap_ijking.py).
+
+HOORT HIER NIET:
+  Proefdata en ijkpunten. Dat zijn bestanden van honderden kilobytes tot ruim
+  een megabyte die alleen bestaan om de overzetting Python <-> JavaScript te
+  toetsen. Ze staan sinds 18-09 in RL/ijkpunten/ en alle scripts schrijven en
+  lezen ze daar:
+
+      baarden_proef.json          js_export.py
+      baarden_stellingen.json     js_toestand_dump.py
+      baarden_acties.json         js_acties_dump.py
+      baarden_stefaanzetten.json  js_stefaan_dump.py
+
+  Staan die hier toch nog, dan zijn het overblijfselen van voor die datum en
+  mogen ze weg. Ze staan ook nog bij naam in de ignore-lijst van firebase.json,
+  dus ze worden hoe dan ook niet gedeployd -- maar een bestand dat er niet is,
+  kan ook niet per ongeluk uit die lijst vallen.
+
+REGEL: komt er een nieuw .json-bestand in deze map dat geen gewichten bevat,
+dan is er iets misgegaan. Proefdata hoort in RL/ijkpunten/.

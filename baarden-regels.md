@@ -1,6 +1,6 @@
 # Baarden — Spelregels
 
-> Status: **v0.10 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
+> Status: **v0.11 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
 
 ---
 
@@ -179,12 +179,14 @@ Tijdens de bewegingsfase (5.2) verplaats je een kaart 1 vakje. **Bevestigd:** di
 | Jouw kaart heeft een **gelijke** waarde | Je kaart komt **boven op** de kaart van de tegenstander te liggen (stapelen). De onderste kaart is dan **geblokkeerd** (kan niet bewegen) tot de bovenste kaart wegbeweegt. De bovenste kaart zelf ondervindt geen beperking. |
 | Jouw kaart heeft een **lagere** waarde | Illegale zet. |
 
-### 8.1a Een gestapeld vakje doorbreken — **bevestigd, belangrijke correctie**
-Als het vakje dat je aanvalt (met een hogere waarde) al **meer dan 1 kaart** bevat (dus de bovenste kaart lag zelf al boven op iets anders), dan geldt een andere regel dan gewoon vernietigen: **de volledige stapel én je eigen aanvallende kaart verdwijnen allemaal compleet uit het spel** (niet naar de aflegstapel — net als bij een toren-reset, zie 7.3). Het vakje wordt dus leeg.
+### 8.1a Een gestapeld vakje doorbreken — **bevestigd**
+Als het vakje dat je aanvalt (met een hogere waarde) al **meer dan 1 kaart** bevat (dus de bovenste kaart lag zelf al boven op iets anders), dan geldt een andere regel dan gewoon vernietigen: **je aanvallende kaart overleeft altijd** en neemt het vakje in. De **volledige stapel** die er lag gaat naar de gesneuvelden — elke laag naar zijn eigen eigenaar — en kan daar later via een toren-reset (7.3) weer tot leven geroepen worden.
 
-Omdat een stapel altijd kleur-per-kleur afwisselt (je kan nooit op je eigen kleur stapelen), betekent dit **in de praktijk altijd** dat je bij het doorbreken van een stapel ook je **eigen, daaronder geblokkeerd liggende kaart** opoffert — puur om de bovenste kaart van de tegenstander te vernietigen. Een gewoon (niet-gestapeld) vakje aanvallen blijft wel gewoon de normale regel uit 8.1 volgen (kaart vernietigd naar de aflegstapel, jij neemt het vakje in).
+Enkel de kaarten die je in je toren verwerkt verdwijnen écht uit het spel. Bij het doorbreken van een stapel verdwijnt er dus niets definitief.
 
-**Voorbeeld (uit je uitleg):** een zwarte vrouw ligt bovenop een rode vrouw (2 lagen). Een rode aas verslaat de zwarte vrouw — maar omdat het vakje gestapeld was, verdwijnen alle 3 betrokken kaarten (de rode vrouw eronder, de zwarte vrouw erboven, én de rode aas zelf) volledig uit het spel. Het vakje is nadien leeg.
+Omdat een stapel altijd kleur-per-kleur afwisselt (je kan nooit op je eigen kleur stapelen), sneuvelt bij het doorbreken naast de kaart van de tegenstander ook je **eigen, daaronder geblokkeerd liggende kaart**. Die is niet weg: hij ligt bij je gesneuvelden en komt in aanmerking om herleefd te worden. Een gewoon (niet-gestapeld) vakje aanvallen blijft de normale regel uit 8.1 volgen (kaart vernietigd naar de aflegstapel, jij neemt het vakje in).
+
+**Voorbeeld:** een zwarte vrouw ligt bovenop een rode vrouw (2 lagen). Een rode aas verslaat de zwarte vrouw. Beide vrouwen gaan naar de gesneuvelden van hun eigen eigenaar; de rode aas blijft leven en komt op het vakje te liggen.
 
 ### 8.1b De 2-tegen-Aas-uitzondering — **bevestigd**
 Een Aas is de hoogste waarde, en zou dus normaal door niets verslagen kunnen worden. Als uitzondering hierop geldt: **een 2 kan een Aas verslaan** (ondanks dat 2 normaal de laagste waarde is). Dit is de enige uitzondering op de waarde-volgorde uit sectie 8. Verder gelden voor deze overwinning gewoon de normale regels — dus inclusief 8.1a als die Aas zelf bovenop een stapel lag.
@@ -217,6 +219,7 @@ Geen — alle regels zijn bevestigd. Dit document beschrijft het volledige, afge
 
 ## 10. Wijzigingslog
 
+- **v0.11** — Correctie (sectie 8.1a): bij het doorbreken van een gestapeld vakje **overleeft de aanvallende kaart altijd** en neemt ze het vakje in; de stapel die er lag gaat naar de gesneuvelden van de respectieve eigenaars en blijft dus herleefbaar. Tot hiertoe stond er dat alle betrokken kaarten volledig uit het spel verdwenen, inclusief je eigen aanvaller. Dat klopte niet met hoe het spel zich al die tijd gedroeg — enkel kaarten die je in je toren verwerkt verdwijnen écht. De regeltekst in het spel en de PDF waren op 13-09 al gecorrigeerd; dit document liep achter.
 - **v0.10** — Nieuwe regel (sectie 8.3): komt exact dezelfde stelling (zelfde bord, zelfde speler aan zet in dezelfde fase) voor de 3de keer voor, dan eindigt het spel in een gelijkspel, net als in schaken. De digitale versie waarschuwt subtiel na de 2de keer.
 - **v0.9.1** — Correctie (secties 8.1b en 8.2): een Aas kan een 2 niet slaan — geen gewone 2, en ook geen toren van waarde 2. De 2-tegen-Aas-uitzondering werkt dus in beide richtingen; voorheen liet het spel een Aas een 2 gewoon veroveren.
 - **v0.9** — Nieuwe regel: na een Boer-reset (sectie 7.3) kan die toren de rest van diezelfde ronde niet meer verder opgewaardeerd worden, ook al is er nog een passende kaart beschikbaar. Vanaf de volgende ronde kan dit weer normaal. Daarnaast een belangrijke bugfix: gesneuvelde kaarten zaten per ongeluk in dezelfde aflegstapel als gewone afgelegde kaarten en werden soms per ongeluk herschud/verwijderd — ze hebben nu een eigen, permanente plek die nooit herschud wordt.
