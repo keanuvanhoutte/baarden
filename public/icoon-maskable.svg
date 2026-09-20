@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Baarden">
+  <!-- Maskable variant: Android snijdt zo'n icoon bij tot een cirkel of afgeronde vorm naar keuze
+       van het toestel. Daarom loopt het groen hier van rand tot rand en is het kader weggelaten —
+       dat zou er net afgesneden worden. De letter staat kleiner, binnen de veilige middencirkel. -->
+  <defs>
+    <linearGradient id="laken" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14573f"/>
+      <stop offset="1" stop-color="#06271d"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#laken)"/>
+  <text x="256" y="352" text-anchor="middle" font-family="Georgia, 'Times New Roman', Times, serif"
+        font-size="264" font-weight="bold" fill="#e3c76a">B</text>
+</svg>

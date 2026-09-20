@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Baarden</title>
+
+<!-- Icoon voor het tabblad, de bladwijzer en de snelkoppeling op je beginscherm. Zonder deze
+     regels viel elke van die plekken terug op een grijs standaardicoontje.
+     Bewust alleen PNG en geen SVG: de letter in icoon.svg is tekst, en Georgia staat niet op elk
+     toestel — dan zou de B er elders anders uitzien. Deze bestanden zijn hier één keer vanuit die
+     SVG gerasterd, dus overal identiek. De kleine formaten missen het gouden kader, omdat dat op
+     16 pixels de letter verdrong. -->
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="favicon-48.png" sizes="48x48" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b3d2e">
+<meta name="apple-mobile-web-app-title" content="Baarden">
 <!-- Firebase SDK -->
 <script src="firebaseConfig.js"></script>
 <style>
