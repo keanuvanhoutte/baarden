@@ -427,7 +427,7 @@
   .assump{ font-size:11px; opacity:.6; text-align:center; max-width:520px; margin:10px auto 0 auto; }
   .winner-banner{ text-align:center; font-size:20px; color:var(--gold); font-weight:bold; margin:4px 0; }
   .export-rij{ text-align:center; margin:6px 0 10px; }
-  .export-rij button{ font-size:13px; padding:8px 14px; }
+  .export-rij button{ font-size:13px; padding:8px 14px; margin:0 3px; }
   .export-uitleg{ font-size:11px; opacity:.7; margin-top:4px; }
   .export-vak{ display:none; width:100%; height:80px; margin-top:6px; font-family:monospace; font-size:10px; }
   .turn-indicator{ font-size:11px; opacity:.85; margin-bottom:2px; display:flex; align-items:center; gap:5px; }
@@ -3589,6 +3589,7 @@ function exportKnopHTML(){
   if(!n) return '';
   return `<div class="export-rij">
       <button id="exportPartijKnop" onclick="exporteerPartij()">Kopieer deze partij (${n} stellingen)</button>
+      <button id="bewaarPartijKnop" onclick="bewaarPartij()">Bewaar als bestand</button>
       <div id="exportPartijUitleg" class="export-uitleg">Voor het nakijken: plakken in RL/importeer_partij.py</div>
     </div>`;
 }
@@ -3616,6 +3617,28 @@ async function exporteerPartij(){
   } catch(err){
     zeg('Exporteren mislukte: ' + err.message);
     console.warn('Baarden: exporteren van de partij mislukte.', err);
+  }
+}
+
+// Het klembord is een omweg met risico: de tekst reist door een venster, een editor of een
+// chatgesprek, en daar sneuvelt vroeg of laat een teken. Gecomprimeerde tekst is daar niet tegen
+// bestand -- een enkele verandering maakt de hele partij onleesbaar. Een bestand komt er ongeschonden
+// doorheen, en dat is de reden dat deze knop er staat.
+async function bewaarPartij(){
+  const uitleg = document.getElementById('exportPartijUitleg');
+  try {
+    const tekst = await BaardenOpname.tekst();
+    const naam = 'baarden-partij-' + new Date().toISOString().slice(0,16).replace(/[:T]/g,'-') + '.txt';
+    const blob = new Blob([tekst], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = naam;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 10000);
+    if(uitleg) uitleg.textContent = naam + ' -- zet dit bestand in RL/partijen/';
+  } catch(err){
+    if(uitleg) uitleg.textContent = 'Bewaren mislukte: ' + err.message;
+    console.warn('Baarden: bewaren van de partij mislukte.', err);
   }
 }
 
