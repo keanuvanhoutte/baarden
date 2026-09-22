@@ -426,6 +426,10 @@
   .reserve .rbox{ border:1px dashed var(--line); border-radius:6px; padding:4px 10px; }
   .assump{ font-size:11px; opacity:.6; text-align:center; max-width:520px; margin:10px auto 0 auto; }
   .winner-banner{ text-align:center; font-size:20px; color:var(--gold); font-weight:bold; margin:4px 0; }
+  .export-rij{ text-align:center; margin:6px 0 10px; }
+  .export-rij button{ font-size:13px; padding:8px 14px; }
+  .export-uitleg{ font-size:11px; opacity:.7; margin-top:4px; }
+  .export-vak{ display:none; width:100%; height:80px; margin-top:6px; font-family:monospace; font-size:10px; }
   .turn-indicator{ font-size:11px; opacity:.85; margin-bottom:2px; display:flex; align-items:center; gap:5px; }
   .turn-indicator .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; border:1px solid var(--gold); }
   .turn-indicator .dot.red{ background:var(--red); }
@@ -722,6 +726,8 @@
      ze stuk, dan valt het spel terug op de oude AI en merkt de speler er niets van. -->
 <script src="js/baarden_net.js"></script>
 <script src="js/baarden_toestand.js"></script>
+<script src="js/baarden_waardering.js"></script>
+<script src="js/baarden_opname.js"></script>
 <script src="js/baarden_acties.js"></script>
 <script src="js/baarden_bot.js"></script>
 <script src="js/baarden_zoek.js"></script>
@@ -2201,6 +2207,19 @@ function startSolo(){
   roomCode = null;
   myColor = null;
   state = createInitialState();
+  // Ook een solopartij wordt meegeschreven. Er zit geen bot in, dus voor het nakijken van
+  // de bot is hij niets waard -- maar als ijkpunt voor hoe mensen spelen wel, en het is
+  // vervelend om na afloop te merken dat juist die partij niet bewaard is.
+  if(window.BaardenOpname){
+    BaardenOpname.start({
+      datum: new Date().toISOString().slice(0,16),
+      modus: 'solo',
+      jouwKleur: null,
+      botKleur: null,
+      waarderingsnetwerk: (typeof WAARDERING_AAN !== 'undefined') && WAARDERING_AAN,
+      netwerkVersie: (typeof WAARDERING_VERSIE !== 'undefined') ? WAARDERING_VERSIE : null,
+    });
+  }
   state.players.red = true;
   state.players.black = true;
   document.getElementById('lobbyWrap').style.display='none';
@@ -2335,6 +2354,21 @@ function startVsAI(){
   aiColor = other(humanColor);
   roomCode = null;
   state = createInitialState();
+  // De partij meeschrijven. Wat hier in `meta` staat, is wat je achteraf nodig hebt om te
+  // weten WAT je precies gespeeld hebt -- zonder dat kun je twee exports niet uit elkaar
+  // houden, en dan is de opname niets waard.
+  if(window.BaardenOpname){
+    BaardenOpname.start({
+      datum: new Date().toISOString().slice(0,16),
+      modus: 'tegen-ai',
+      jouwKleur: humanColor,
+      botKleur: aiColor,
+      botNiveau: aiNiveau,
+      botNaam: (AI_TEGENSTANDERS[aiNiveau-1] || {}).naam || ('trap ' + aiNiveau),
+      waarderingsnetwerk: (typeof WAARDERING_AAN !== 'undefined') && WAARDERING_AAN,
+      netwerkVersie: (typeof WAARDERING_VERSIE !== 'undefined') ? WAARDERING_VERSIE : null,
+    });
+  }
   state.players.red = true;
   state.players.black = true;
   document.getElementById('lobbyWrap').style.display='none';
@@ -3534,6 +3568,89 @@ function nextTurnState(starter, phaseIndex){
 
 // oppBlok: heeft de tegenstander zijn blok-kaart op deze lijn nog naast het bord? Laat je hem weg, dan
 // geldt de echte spelstand.
+// De waarde van een blad, vanuit maxColor gezien. Dit is het ENIGE punt waar de zoekboom een stelling
+// beoordeelt, en daarom staat het apart: zo is het waarderingsnetwerk in te schakelen zonder dat er aan
+// de zoeker, de legfase of de blok-logica iets verandert. Precies dezelfde splitsing als Stefaan._blad()
+// in RL/baarden_stefaan.py, en die is daar bewezen gelijk aan de versie ervoor (vingerafdruk_stefaan.py).
+//
+// Het netwerk krijgt het bord uit de boom met de CONTEXT VAN DE WORTEL: hand, hold, gesneuvelden, fase
+// en ronde komen uit de levende `state`. Binnen deze boom verandert daar niets -- er wordt alleen over
+// kaartzetten en blok-plaatsingen gezocht -- dus dat klopt. RL/bordbrug.py doet hetzelfde en legt in
+// zijn kop uit wat die aanname NIET dekt.
+//
+// Staat het netwerk uit of is het niet geladen, dan blijft alles exact zoals het was.
+// -- de partij exporteren -------------------------------------------------------------------------
+// Verschijnt bij ELK einde, niet alleen bij winst. Een verloren partij laat net zo goed zien waar de
+// bot een kans kreeg, en een gelijkspel waar hij bleef rondschuiven -- dat zijn precies de drie
+// dingen die we willen nakijken.
+function exportKnopHTML(){
+  if(!window.BaardenOpname || !BaardenOpname.bezig()) return '';
+  const n = BaardenOpname.aantal();
+  if(!n) return '';
+  return `<div class="export-rij">
+      <button id="exportPartijKnop" onclick="exporteerPartij()">Kopieer deze partij (${n} stellingen)</button>
+      <div id="exportPartijUitleg" class="export-uitleg">Voor het nakijken: plakken in RL/importeer_partij.py</div>
+    </div>`;
+}
+
+async function exporteerPartij(){
+  const knop = document.getElementById('exportPartijKnop');
+  const uitleg = document.getElementById('exportPartijUitleg');
+  const zeg = (t)=>{ if(uitleg) uitleg.textContent = t; };
+  try {
+    const tekst = await BaardenOpname.tekst();
+    // navigator.clipboard werkt alleen op https of localhost. Lukt het niet, dan komt de tekst in
+    // een tekstvak te staan zodat je hem zelf kunt selecteren -- liever een omweg dan een knop die
+    // stil niets doet.
+    let gelukt = false;
+    if(navigator.clipboard && window.isSecureContext){
+      try { await navigator.clipboard.writeText(tekst); gelukt = true; } catch(e){ gelukt = false; }
+    }
+    if(gelukt){
+      if(knop) knop.textContent = 'Gekopieerd (' + Math.round(tekst.length/1024) + ' KB)';
+      zeg('Plakken in RL/importeer_partij.py');
+    } else {
+      toonExportVak(tekst);
+      zeg('Kopieren lukte niet vanzelf -- selecteer de tekst hieronder en kopieer hem zelf.');
+    }
+  } catch(err){
+    zeg('Exporteren mislukte: ' + err.message);
+    console.warn('Baarden: exporteren van de partij mislukte.', err);
+  }
+}
+
+function toonExportVak(tekst){
+  let vak = document.getElementById('exportPartijVak');
+  if(!vak){
+    vak = document.createElement('textarea');
+    vak.id = 'exportPartijVak';
+    vak.className = 'export-vak';
+    vak.readOnly = true;
+    const rij = document.querySelector('.export-rij');
+    if(rij) rij.appendChild(vak); else document.body.appendChild(vak);
+  }
+  vak.value = tekst;
+  vak.style.display = 'block';
+  vak.focus();
+  vak.select();
+}
+
+function bladWaarde(board, maxColor){
+  if(!waarderingAan(maxColor)) return evalBoardHeuristic(board, maxColor);
+  try {
+    const stand = Object.assign({}, state, { board: board, turn: maxColor });
+    // positionCount() rekent de sleutel uit het MEEGEGEVEN bord en de meegegeven beurt, dus dit is
+    // per blad -- precies zoals repetition_count() in RL/bordbrug.py.
+    const vector = BaardenToestand.toestandsVector(stand, { herhaling: positionCount(stand), maxRondes: 120 });
+    return BaardenWaardering.waardeGeschaald(waarderingNet, vector);
+  } catch(err){
+    // Eén keer klagen, daarna stil terugvallen op de oude waardering. Een bot die halverwege een
+    // partij gaat gooien is erger dan een bot die iets zwakker speelt.
+    if(!waarderingKapot){ waarderingKapot = true; console.warn('Baarden: waarderingsnetwerk faalt; de oude waardering neemt het over.', err); }
+    return evalBoardHeuristic(board, maxColor);
+  }
+}
+
 function minimaxSearch(board, depth, maxColor, starter, phaseIndex, alpha, beta, oppBlok){
   if(oppBlok===undefined) oppBlok = opponentBlockInReserve(maxColor);
   const curColor = moverOf(starter, phaseIndex);
@@ -3546,7 +3663,7 @@ function minimaxSearch(board, depth, maxColor, starter, phaseIndex, alpha, beta,
     getBlockTargetsOnBoard(board, curColor).forEach(target => moves.push({ block: target }));
   }
   if(depth===0 || moves.length===0){
-    return { score: evalBoardHeuristic(board, maxColor) };
+    return { score: bladWaarde(board, maxColor) };
   }
   let bestMove = null;
   let best = maximizing ? -Infinity : Infinity;
@@ -3867,6 +3984,41 @@ function towerUpgradeExposesTower(board, color, chain){
 // mogen een dag in de cache van de speler blijven staan -- anders haalt hij ze bij elke partij opnieuw
 // op. Train ik het netwerk opnieuw, dan verander ik dit getal mee, en krijgt iedereen meteen de nieuwe
 // versie in plaats van tot een dag later. Vergeet ik het, dan lost het zichzelf binnen een dag op.
+// -- het waarderingsnetwerk ------------------------------------------------------------------------
+// Vervangt evalBoardHeuristic() aan de bladeren van minimaxSearch(); de rest van de bot blijft zoals
+// hij was: dezelfde zoekboom, dezelfde diepte, dezelfde legfase, dezelfde blok-logica.
+//
+// GEMETEN IN DIT SPEL, in een echte browser (js/meet_waardering.js, 300 partijen, diepte 4):
+//     netwerk tegen de oude waardering   57,3% +-2,8
+//     controle oud tegen oud             50,0%   (58 winst / 58 verlies)
+//     controle netwerk tegen netwerk     50,0%   (68 winst / 68 verlies)
+// Python zei 58,0% +-2,8; die twee komen dus overeen. Dat was bij de vorige bot niet zo (28,5%
+// tegen 20,0%), dus het is nagemeten en niet aangenomen (LESSEN 1.4).
+//
+// De prijs, gemeten met js/meet_bedenktijd.js op zoekende beurten: mediaan 18,8 ms tegen 10,8 ms,
+// traagste 5% 101 ms tegen 30 ms. 1,7x zo traag op een pc; op een telefoon navenant meer.
+//
+// 162 KB, tegen 1,8 MB voor het oude netwerk. Het ?v= werkt zoals hieronder beschreven.
+// Gaat dit ooit weer op false, dan speelt de bot exact zoals hij voor 20 september 2026 speelde.
+const WAARDERING_AAN = true;
+const WAARDERING_VERSIE = '20260920';
+const WAARDERING_PAD = 'js/baarden_waardering.json?v=' + WAARDERING_VERSIE;
+let waarderingNet = null, waarderingKapot = false;
+
+// Neemt maxColor aan, zodat een meetopstelling het netwerk per KANT kan aan- en uitzetten zonder aan
+// `state` te hoeven raken. Binnen één zoekboom staat maxColor vast, dus de bot wisselt nooit halverwege
+// het vooruitkijken van waardering -- dat was bij de vorige meetopstelling een echte val (zie rlStil in
+// js/meet_tegen_oude_ai.js).
+function waarderingAan(maxColor){ return WAARDERING_AAN && waarderingNet !== null; }
+
+function waarderingLaad(){
+  if(waarderingNet || !window.BaardenWaardering || !window.BaardenToestand) return Promise.resolve(false);
+  return fetch(WAARDERING_PAD)
+    .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(blob => { waarderingNet = BaardenWaardering.laad(blob); return true; })
+    .catch(err => { console.warn('Baarden: het waarderingsnetwerk laadde niet; de oude waardering blijft.', err); return false; });
+}
+
 const RL_NET_VERSIE = '20260916';
 const RL_NET_PAD = 'js/baarden_net.json?v=' + RL_NET_VERSIE;
 let rlStatus = 'ongeladen';          // ongeladen | laden | klaar | mislukt
@@ -3894,6 +4046,7 @@ function rlLaad(){
     getLegalNormalMoves, computeTowerChain, isBlockBuried, getBlockTargets,
   });
   rlStatus = 'laden';
+  waarderingLaad();
   BaardenBot.laad(RL_NET_PAD)
     .then(()=>{ rlStatus = 'klaar'; })
     .catch(err=>{ rlStatus = 'mislukt'; console.warn('Baarden: het netwerk laadde niet; de oude AI neemt het over.', err); });
@@ -4405,10 +4558,15 @@ function renderAll(){
     (herhaling===2 ? `<span class="herhaling" title="Deze stelling kwam al 2 keer voor. Komt ze nog een keer, dan eindigt het spel in een gelijkspel.">↻ 2× dezelfde stelling</span>` : '');
   renderAiTegenstander();
 
+  // De partij meeschrijven, zodat ze achteraf na te kijken is. Alleen tegen de AI, en
+  // alleen als de module geladen is. leg() legt enkel vast als er echt iets veranderd is
+  // en gooit nooit, dus dit kan een partij niet verstoren.
+  if((aiMode || soloMode) && window.BaardenOpname && BaardenOpname.bezig()) BaardenOpname.leg(state);
+
   document.getElementById('winnerBanner').innerHTML = !state.winner ? ''
     : state.winner==='draw'
-      ? `<div class="winner-banner">🤝 Gelijkspel — dezelfde stelling kwam 3 keer voor.</div>`
-      : `<div class="winner-banner">🏆 ${label(state.winner)} heeft de toren veroverd!</div>`;
+      ? `<div class="winner-banner">🤝 Gelijkspel — dezelfde stelling kwam 3 keer voor.</div>${exportKnopHTML()}`
+      : `<div class="winner-banner">🏆 ${label(state.winner)} heeft de toren veroverd!</div>${exportKnopHTML()}`;
 
   renderBoard();
   renderFallenBadges();
