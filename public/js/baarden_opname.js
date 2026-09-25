@@ -42,6 +42,12 @@
     'board', 'hold', 'blockReserve', 'draw', 'discard', 'fallen', 'destroyed',
     'hand', 'roundNumber', 'starter', 'turn', 'phase', 'actedThisPhase',
     'towerResetThisRound', 'towerBuild', 'reviveChoice',
+    // Twee velden die de bot WEL gebruikt maar die er eerst niet in stonden.
+    // Zonder deze kan Python de beslissing van de bot niet naspelen: hij ziet
+    // dan geen gelijkspel door herhaling, en denkt dat de blok-kaart altijd
+    // vrij te verleggen is. Beide zijn partijgeheugen, geen bordstand -- en
+    // juist dat soort velden vergeet je.
+    'positionCounts', 'blockMovedRound',
   ];
 
   let opname = null;

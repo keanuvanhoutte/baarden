@@ -1924,11 +1924,12 @@ function collectRemoteAnimations(prev, next){
     }
   });
 
-  // De winnende zet: een kaart die een vijandelijke toren verovert verdwijnt van het bord.
-  // attemptMove haalt hem van zijn vakje maar zet hem nergens neer, want het spel is op dat moment
-  // afgelopen. Daardoor stond hij niet in de nieuwe stand en kreeg de tegenstander géén animatie te
-  // zien van juist de belangrijkste zet van de partij. We leiden hem af uit de winnaar die er net
-  // bij is gekomen: de verdwenen kaart van die kleur die naast de veroverde toren lag.
+  // Vangnet voor een stand van een OUDERE versie van het spel. Daar liet attemptMove de
+  // veroverende kaart van het bord verdwijnen, en dan ziet de lus hierboven hem niet: hij staat
+  // niet in `after`. We leiden hem dan af uit de winnaar die er net bij is gekomen — de verdwenen
+  // kaart van die kleur die naast de veroverde toren lag. Sinds attemptMove de kaart wél op de
+  // toren legt, slaat dit blok zichzelf over (`after[id]` bestaat dan), dus er komt geen tweede
+  // animatie bij. Het blijft staan omdat de tegenstander een oude versie uit zijn cache kan draaien.
   if(next.winner && !prev.winner && animated.indexOf(next.winner) !== -1){
     const torenCel = towerCellOf(other(next.winner));
     const buren = neighbors(torenCel);
@@ -2201,6 +2202,26 @@ function generateRoomCode(){
   document.getElementById('lobbyMsg').textContent = `Code: ${code} — deel deze met de andere speler en druk dan op "Kamer starten / joinen".`;
 }
 
+// De opname begint hier, en op alle DRIE de plekken waar een nieuwe partij begint: startVsAI(),
+// startSolo() en resetRoom(). Die laatste stond er eerst niet in, en daardoor liepen opeenvolgende
+// partijen uit een sessie aan elkaar vast in een bestand: de eerste export bevatte drie partijen
+// achter elkaar, met alleen de gegevens van de eerste in de kop. Een startpad dat je vergeet, merk
+// je pas als je de opname probeert te lezen.
+function startOpname(modus){
+  if(!window.BaardenOpname) return;
+  const solo = (modus === 'solo');
+  BaardenOpname.start({
+    datum: new Date().toISOString().slice(0,16),
+    modus: modus,
+    jouwKleur: solo ? null : myColor,
+    botKleur: solo ? null : aiColor,
+    botNiveau: solo ? null : aiNiveau,
+    botNaam: solo ? null : ((AI_TEGENSTANDERS[aiNiveau-1] || {}).naam || ('trap ' + aiNiveau)),
+    waarderingsnetwerk: (typeof WAARDERING_AAN !== 'undefined') && WAARDERING_AAN,
+    netwerkVersie: (typeof WAARDERING_VERSIE !== 'undefined') ? WAARDERING_VERSIE : null,
+  });
+}
+
 function startSolo(){
   soloMode = true;
   showConnectionStatus(false);
@@ -2208,18 +2229,8 @@ function startSolo(){
   myColor = null;
   state = createInitialState();
   // Ook een solopartij wordt meegeschreven. Er zit geen bot in, dus voor het nakijken van
-  // de bot is hij niets waard -- maar als ijkpunt voor hoe mensen spelen wel, en het is
-  // vervelend om na afloop te merken dat juist die partij niet bewaard is.
-  if(window.BaardenOpname){
-    BaardenOpname.start({
-      datum: new Date().toISOString().slice(0,16),
-      modus: 'solo',
-      jouwKleur: null,
-      botKleur: null,
-      waarderingsnetwerk: (typeof WAARDERING_AAN !== 'undefined') && WAARDERING_AAN,
-      netwerkVersie: (typeof WAARDERING_VERSIE !== 'undefined') ? WAARDERING_VERSIE : null,
-    });
-  }
+  // de bot is hij niets waard -- maar als ijkpunt voor hoe mensen spelen wel.
+  startOpname('solo');
   state.players.red = true;
   state.players.black = true;
   document.getElementById('lobbyWrap').style.display='none';
@@ -2354,21 +2365,7 @@ function startVsAI(){
   aiColor = other(humanColor);
   roomCode = null;
   state = createInitialState();
-  // De partij meeschrijven. Wat hier in `meta` staat, is wat je achteraf nodig hebt om te
-  // weten WAT je precies gespeeld hebt -- zonder dat kun je twee exports niet uit elkaar
-  // houden, en dan is de opname niets waard.
-  if(window.BaardenOpname){
-    BaardenOpname.start({
-      datum: new Date().toISOString().slice(0,16),
-      modus: 'tegen-ai',
-      jouwKleur: humanColor,
-      botKleur: aiColor,
-      botNiveau: aiNiveau,
-      botNaam: (AI_TEGENSTANDERS[aiNiveau-1] || {}).naam || ('trap ' + aiNiveau),
-      waarderingsnetwerk: (typeof WAARDERING_AAN !== 'undefined') && WAARDERING_AAN,
-      netwerkVersie: (typeof WAARDERING_VERSIE !== 'undefined') ? WAARDERING_VERSIE : null,
-    });
-  }
+  startOpname('tegen-ai');
   state.players.red = true;
   state.players.black = true;
   document.getElementById('lobbyWrap').style.display='none';
@@ -2540,6 +2537,7 @@ async function resetRoom(){
   if(soloMode || aiMode){
     state = createInitialState();
     state.players.red = true; state.players.black = true;
+    startOpname(soloMode ? 'solo' : 'tegen-ai');
     renderAll();
     return;
   }
@@ -3223,6 +3221,15 @@ function attemptMove(color, srcCell, destCell){
     return {type:'moved'};
   }
   if(evalResult.type==='wins'){
+    // De veroverende kaart moet ook ECHT op de toren komen te liggen. Hier stond eerst niets:
+    // de kaart werd van zijn eigen vakje gehaald en nergens neergezet, want "het spel is toch
+    // afgelopen". Gevolg: de animatie vloog naar de toren, en daarna tekende renderAll() een
+    // onaangeroerde toren met de winnende kaart verdwenen van het bord. Juist de beslissende
+    // zet van de partij was de enige die je niet kon nakijken.
+    // Stapelen en niet vervangen, zodat de veroverde toren er achter uit blijft piepen —
+    // anders lijkt het alsof de toren er nooit gestaan heeft.
+    destStack.push(movingPiece);
+    state.board[destCell] = destStack;
     return {type:'wins'};
   }
   if(evalResult.type==='captured'){
@@ -3535,7 +3542,11 @@ function simulateMove(board, color, src, dest){
   srcStack.pop();
   nb[src] = srcStack.length ? srcStack : null;
   let destStack = nb[dest] ? nb[dest] : [];
-  if(evalR.type==='wins'){ nb[dest] = [movingPiece]; return {board:nb, winner:color}; }
+  // Bovenop de toren, net als in attemptMove — en net als simuleer_zet en pas_toe aan de
+  // Python-kant. De zoeker kijkt naar dit bord nooit meer (zodra sim.winner gezet is scoort
+  // hij ±1e6 zonder het te bekijken), maar vier plekken die hetzelfde horen te doen en het
+  // net niet doen, is precies waar een verschil tussen de twee zoekers gaat zitten.
+  if(evalR.type==='wins'){ destStack.push(movingPiece); nb[dest] = destStack; return {board:nb, winner:color}; }
   if(evalR.type==='moved' || evalR.type==='captured'){ nb[dest] = [movingPiece]; }
   else { destStack.push(movingPiece); nb[dest] = destStack; }
   return {board:nb, winner:null};

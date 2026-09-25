@@ -545,6 +545,73 @@ twee metingen onder de 40% tegen het eigen startpunt en de reeks stopt.
 
 ---
 
+# Deel 3b — Waar je een waarderingsnetwerk wel en niet inzet
+
+## 3b.1 Een waarderingsnetwerk heeft zoeken nodig om iets waard te zijn
+
+*22-23 september. Drie metingen met hetzelfde netwerk op drie plekken.*
+
+Een netwerk dat de uitslag voorspelt is niet zomaar "een beter oordeel" dat je
+overal kunt inpluggen. Hetzelfde netwerk, in hetzelfde spel, tegen dezelfde
+handgeschreven waardering:
+
+| waar het netwerk oordeelt | vooruitkijken | score |
+|---|---|---|
+| de legfase (kaart neerleggen) | 0 zetten | 26,5% ±3,5 |
+| de bladeren van de zoekboom, diepte 2 | 2 zetten | 46,5% ±3,5 |
+| de bladeren van de zoekboom, diepte 4 | 4 zetten | 58,0% ±2,8 |
+
+Het voordeel groeit met de zoekdiepte, en zonder zoeken keert het om in een
+zwaar nadeel. Dat is geen toeval maar het karakter van het ding: een
+uitslagvoorspeller zegt "vanuit dit soort stellingen win ik ongeveer zo vaak",
+en dat is een gemiddelde over de verre toekomst. Om er iets aan te hebben moet
+iets anders de varianten uitrekenen die erheen leiden -- dat is de zoekboom.
+Waar geen boom staat, staat er een vage uitspraak op een plek die een scherpe
+uitspraak nodig heeft.
+
+De handgeschreven waardering die het verloor bij diepte 4, wint bij diepte 0
+juist ruim. Ze is grof -- in dit spel in de praktijk alleen het torenverschil
+-- maar ze is concreet en wijst rechtstreeks naar de winstvoorwaarde.
+
+> **Regel.** Meet je waarderingsnetwerk op elke plek waar je het wilt inzetten,
+> apart, en zet de zoekdiepte van die plek erbij. "Het netwerk is beter dan de
+> formule" is geen eigenschap van het netwerk maar van het netwerk PLUS het
+> zoeken eromheen.
+
+> **Regel.** Gaat een beslissing zonder vooruitkijken, overweeg dan of een
+> uitslagvoorspeller daar wel het juiste gereedschap is. Vaak is een grove maar
+> concrete regel daar beter, en is het antwoord "geef die beslissing een
+> zoekboom", niet "geef hem een beter netwerk".
+
+## 3b.2 Eén hook verklaarde een oude mislukking
+
+De allereerste proef van dit project liet het netwerk het hele spel doen en gaf
+25,8%. Het was toen onduidelijk waar die instorting vandaan kwam; er werd
+alleen vastgesteld dat de proef te veel tegelijk veranderde.
+
+Door later precies één ding te vervangen -- alleen de legfase -- kwam er 28,2%
+uit. Bijna de hele instorting zat dus daar, en dat was met één meting van een
+half uur vast te stellen zodra de rest apart getoetst was.
+
+> **Regel.** Een oude, onverklaarde mislukking is vaak achteraf toe te wijzen
+> zodra je de onderdelen los kunt schakelen. Bouw die schakelaars, ook als het
+> experiment al voorbij is -- ze betalen zich terug bij het volgende.
+
+## 3b.3 Controleer dat je ingreep überhaupt iets doet
+
+Voor de legfase-meting stond er een controle bij die geen uitslag opleverde
+maar wel noodzakelijk was: verandert de bot met de haak aan werkelijk zijn
+keuzes? Gemeten: 105 van de 306 legfase-keuzes anders, 34%.
+
+Zonder die controle had een uitslag rond de 50% net zo goed "de haak deed
+niets" kunnen betekenen als "het netwerk helpt niet". Twee heel verschillende
+conclusies, niet uit elkaar te halen achteraf.
+
+> **Regel.** Bij elke A-tegen-B-meting waarin B een ingreep is: toon eerst dat
+> B zich anders gedraagt dan A. Een ingreep die niet aanslaat, geeft keurig 50%.
+
+---
+
 # Deel 4 — Werkwijze
 
 ## 4.1 Drempels die je blijft verlagen
@@ -595,6 +662,31 @@ gecorrigeerde spelregel, de andere — de versie die live stond — nog de oude.
 
 > **Regel.** Eén bestand is de waarheid. Een kopie "voor de zekerheid" krijgt een
 > naam waar "niet gebruiken" in staat, of gaat weg.
+
+## 4.6 De eindstand is ook een stand
+
+Wie een vijandelijke toren veroverde, zag zijn kaart erheen vliegen en daarna
+verdwijnen: `attemptMove()` haalde haar van haar vakje en zette haar nergens
+neer, want "het spel is toch afgelopen". Juist de beslissende zet van de partij
+was de enige die je niet kon nakijken. Hij stond ruim een jaar in het spel.
+
+Er waren vier plekken die dezelfde zet uitvoeren — `attemptMove` en
+`simulateMove` in het spel, `_apply_move` en `pas_toe`/`simuleer_zet` in Python —
+en ze deden alle vier iets anders met de veroverde toren: weglaten, vervangen,
+vervangen, vervangen. Niemand merkte het, omdat de zoeker bij een winnaar meteen
+±WINST scoort zonder het bord nog te bekijken. De waarde is dood — tot je de twee
+motoren stelling voor stelling naast elkaar legt, en dan is het een verschil.
+
+De reparatie was één regel. Hem vinden kostte niets; hem vertrouwen wel: eerst
+een proef die de fout aantoont (met de reparatie teruggedraaid zakt hij, met
+reparatie slaagt hij), en daarna bewijzen dat de zetkeuze er níét door
+veranderde — dezelfde vingerafdruk-hashes vóór en na.
+
+> **Regel.** Een dode waarde is alleen dood tot iemand hem vergelijkt. Laat de
+> code ook in een tak die "er niet meer toe doet" de waarheid opschrijven.
+>
+> **Regel.** Een visuele fout toets je op het scherm, niet in de toestand. Dat
+> de kaart in `state.board` staat, zegt niet dat een speler haar ziet liggen.
 
 ---
 
