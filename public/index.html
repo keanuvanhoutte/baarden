@@ -3253,6 +3253,13 @@ function attemptMove(color, srcCell, destCell){
 // Gewichten van de heuristische evaluatiefunctie. Kunnen verbeterd worden door het losse
 // trainingsscript (baarden-train.js) lokaal te laten draaien — kopieer de uitkomst hierin.
 let AI_WEIGHTS = { towerDiff:111.70481965674506, ownCardVal:0.05, oppCardVal:0.10356158334450093, ownAdvance:0.9995500917448126, oppThreat:0.1291231743405385, blockBonus:0.19230643261433683 }; // getraind via baarden-train.js
+// Zetvolgorde in de zoekboom aan of uit. Staat apart zodat de winst te meten is
+// en zodat hij met een enkele regel terug kan als er ooit iets mee blijkt te zijn.
+const ZETVOLGORDE_AAN = true;
+// De bladwaarde-tabel aan of uit. Staat apart zodat de winst eerlijk te meten is: met en zonder,
+// achter elkaar, op dezelfde machine. De eerste metingen liepen terwijl er een zware Python-meting
+// op negen kernen draaide, en dan meet je vooral hoe druk de pc het had.
+const BLADCACHE_AAN = true;
 const AI_SEARCH_DEPTH = 4; // aantal zetten (plies) vooruitkijken tijdens de bewegingsfase, op volle sterkte
 
 /* ---------- Moeilijkheid: vijf tegenstanders ---------- */
@@ -3566,6 +3573,49 @@ function getLegalNormalMoves(board, color){
   return moves;
 }
 
+// Welke soort zet als eerste geprobeerd wordt in de zoekboom.
+const ZETVOLGORDE = { wins:0, captured:1, stacked:2, moved:3 };
+
+// getLegalNormalMoves, maar met de kansrijkste zet vooraan.
+//
+// Alpha-beta snoeit alleen goed als de beste zet vooraan staat: een winnende zet of een slag geeft
+// meteen een afkapping, waarna de rest van de tak niet meer bekeken hoeft te worden. Zonder volgorde
+// — zoals het was — komen de zetten in de volgorde waarin de vakjes toevallig langskomen, en dat is
+// zowat het slechtste geval voor alpha-beta.
+//
+// Dit is geen kwestie van netheid maar van SPEELSTERKTE: twee plies extra zoekdiepte zijn in dit
+// spel meer waard dan de hele bladwaardering (gemeten: 61% tegen 57%), en wat het snoeien bespaart
+// kan in diepte gestoken worden. In Python leverde dit 1,6x tot 1,9x op.
+//
+// LET OP — dit mag de GEKOZEN ZET niet veranderen. Bij exacte alpha-beta verandert de volgorde
+// alleen de tijd, niet de uitkomst; js/test_stefaan.js bewaakt dat de twee talen dezelfde zet
+// blijven kiezen. Daarom ook alleen BINNEN de boom en niet in de wortel: chooseBestMoveCautiously()
+// breekt gelijke scores op eigen regels (remVooruit), en die mogen niet van de volgorde afhangen.
+function getLegalNormalMovesOrdered(board, color){
+  const moves = [];
+  ALL_CELLS.forEach(src=>{
+    const stack = board[src];
+    if(!stack || !stack.length) return;
+    const top = stack[stack.length-1];
+    if(top.owner!==color || top.kind!=='normal') return;
+    neighbors(src).forEach(dest=>{
+      const ev = evaluateMoveOnBoard(board, color, top, dest);
+      if(!ev.legal) return;
+      let slag = 0;
+      if(ev.type==='captured'){
+        const ds = board[dest];
+        const onder = ds && ds[ds.length-1];
+        slag = onder ? -valueOf(onder.rank) : 0;
+      }
+      moves.push({src, dest, _rang: ZETVOLGORDE[ev.type], _slag: slag});
+    });
+  });
+  moves.sort((a,b)=> (a._rang-b._rang) || (a._slag-b._slag)
+                     || (a.src<b.src?-1:a.src>b.src?1:0)
+                     || (a.dest<b.dest?-1:a.dest>b.dest?1:0));
+  return moves;
+}
+
 // Minimax met alpha-beta afkapping. maxColor = voor wie we optimaliseren; curColor = wie nu zet.
 // Bevestigd echte beurtvolgorde: binnen een ronde beweegt de starter eerst, dan de andere speler;
 // bij het begin van de volgende ronde wisselt de starter, waardoor de net-niet-starter van de
@@ -3669,14 +3719,46 @@ function toonExportVak(tekst){
   vak.select();
 }
 
+// Bladwaarden die deze zoekbeurt al uitgerekend zijn. Alleen gevuld TIJDENS het zoeken (zie
+// aiDoMovePhase); daarbuiten staat hij op null en wordt er niets onthouden, zodat er nooit iets
+// van een vorige stelling in kan meelekken.
+//
+// Waarom dit er is: in een zoekboom komt hetzelfde bord keer op keer terug — eerst A dan B geeft
+// dezelfde stelling als eerst B dan A. Het netwerk opnieuw laten rekenen is dan weggegooid werk, en
+// juist dat is het dure deel. In Python: 65% treffers op diepte 6 en 2,15x sneller, met exact
+// dezelfde zetten (30/30).
+let waarderingCache = null;
+
+// Precies wat de toestandsvector van het bord gebruikt: de bovenste kaart, de hoogte van de stapel
+// en de kaart eronder. Meer niet — elk extra veld maakt de sleutel unieker en de tabel nuttelozer.
+function bordSleutel(board){
+  let s = '';
+  for(let i=0;i<ALL_CELLS.length;i++){
+    const cel = ALL_CELLS[i], stapel = board[cel];
+    if(!stapel || !stapel.length) continue;
+    const top = stapel[stapel.length-1], onder = stapel.length>=2 ? stapel[stapel.length-2] : null;
+    s += cel + top.owner[0] + top.kind[0] + top.rank + stapel.length
+       + (onder ? onder.owner[0] + onder.rank : '') + ';';
+  }
+  return s;
+}
+
 function bladWaarde(board, maxColor){
   if(!waarderingAan(maxColor)) return evalBoardHeuristic(board, maxColor);
+  let sleutel = null;
+  if(waarderingCache){
+    sleutel = bordSleutel(board) + '|' + maxColor;
+    const gevonden = waarderingCache.get(sleutel);
+    if(gevonden !== undefined) return gevonden;
+  }
   try {
     const stand = Object.assign({}, state, { board: board, turn: maxColor });
     // positionCount() rekent de sleutel uit het MEEGEGEVEN bord en de meegegeven beurt, dus dit is
     // per blad -- precies zoals repetition_count() in RL/bordbrug.py.
     const vector = BaardenToestand.toestandsVector(stand, { herhaling: positionCount(stand), maxRondes: 120 });
-    return BaardenWaardering.waardeGeschaald(waarderingNet, vector);
+    const uit = BaardenWaardering.waardeGeschaald(waarderingNet, vector);
+    if(waarderingCache) waarderingCache.set(sleutel, uit);
+    return uit;
   } catch(err){
     // Eén keer klagen, daarna stil terugvallen op de oude waardering. Een bot die halverwege een
     // partij gaat gooien is erger dan een bot die iets zwakker speelt.
@@ -3689,7 +3771,9 @@ function minimaxSearch(board, depth, maxColor, starter, phaseIndex, alpha, beta,
   if(oppBlok===undefined) oppBlok = opponentBlockInReserve(maxColor);
   const curColor = moverOf(starter, phaseIndex);
   const maximizing = (curColor===maxColor);
-  const moves = getLegalNormalMoves(board, curColor);
+  // Geordend, zie getLegalNormalMovesOrdered. Alleen hier, binnen in de boom.
+  const moves = ZETVOLGORDE_AAN ? getLegalNormalMovesOrdered(board, curColor)
+                                : getLegalNormalMoves(board, curColor);
   // Bevestigd (aanwijzing van de speler): een aanval werkt niet zolang de tegenstander zijn blok-kaart
   // nog naast het bord heeft; die legt hem gewoon op de aanvaller. Daarom mag de tegenstander dat hier
   // ook. Zonder deze zetten leek een eenzame kaart naast de vijandelijke toren een zekere winst.
@@ -4384,8 +4468,17 @@ async function aiDoMovePhase(){
   const phaseIndex = (state.turn === state.starter) ? 0 : 1;
   // Een zwakkere tegenstander (zie AI_TEGENSTANDERS) schuift soms zomaar een kaart, zonder na te denken.
   const foutZet = aiMaaktFout() ? willekeurigUit(getLegalNormalMoves(state.board, color)) : null;
-  const moveResult = foutZet ? {move: foutZet, score: 0} : chooseBestMoveCautiously(state.board, color, state.starter, phaseIndex);
-  const blockOption = foutZet ? null : bestBlockOption(state.board, color, state.starter, phaseIndex);
+  // De bladwaarde-tabel staat AAN tijdens deze twee zoekopdrachten en daarna weer uit. Ze delen
+  // dezelfde wortelstelling, dus wat de ene uitrekent mag de andere gebruiken; zodra we klaar zijn
+  // gaat de tabel weg, want bij de volgende beurt is de stand een andere.
+  waarderingCache = BLADCACHE_AAN ? new Map() : null;
+  let moveResult, blockOption;
+  try {
+    moveResult = foutZet ? {move: foutZet, score: 0} : chooseBestMoveCautiously(state.board, color, state.starter, phaseIndex);
+    blockOption = foutZet ? null : bestBlockOption(state.board, color, state.starter, phaseIndex);
+  } finally {
+    waarderingCache = null;
+  }
 
   // Bevestigd: vergelijk de blok-kaart als volwaardig alternatief t.o.v. de beste gewone zet,
   // i.p.v. hem enkel als noodgreep te gebruiken wanneer er toevallig geen andere zet meer is.
