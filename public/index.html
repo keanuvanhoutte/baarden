@@ -429,7 +429,6 @@
   .export-rij{ text-align:center; margin:6px 0 10px; }
   .export-rij button{ font-size:13px; padding:8px 14px; margin:0 3px; }
   .export-uitleg{ font-size:11px; opacity:.7; margin-top:4px; }
-  .export-vak{ display:none; width:100%; height:80px; margin-top:6px; font-family:monospace; font-size:10px; }
   .turn-indicator{ font-size:11px; opacity:.85; margin-bottom:2px; display:flex; align-items:center; gap:5px; }
   .turn-indicator .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; border:1px solid var(--gold); }
   .turn-indicator .dot.red{ background:var(--red); }
@@ -3649,42 +3648,16 @@ function exportKnopHTML(){
   const n = BaardenOpname.aantal();
   if(!n) return '';
   return `<div class="export-rij">
-      <button id="exportPartijKnop" onclick="exporteerPartij()">Kopieer deze partij (${n} stellingen)</button>
-      <button id="bewaarPartijKnop" onclick="bewaarPartij()">Bewaar als bestand</button>
-      <div id="exportPartijUitleg" class="export-uitleg">Voor het nakijken: plakken in RL/importeer_partij.py</div>
+      <button id="bewaarPartijKnop" onclick="bewaarPartij()">Bewaar deze partij (${n} stellingen)</button>
+      <div id="exportPartijUitleg" class="export-uitleg">Voor het nakijken: het bestand doorsturen</div>
     </div>`;
 }
 
-async function exporteerPartij(){
-  const knop = document.getElementById('exportPartijKnop');
-  const uitleg = document.getElementById('exportPartijUitleg');
-  const zeg = (t)=>{ if(uitleg) uitleg.textContent = t; };
-  try {
-    const tekst = await BaardenOpname.tekst();
-    // navigator.clipboard werkt alleen op https of localhost. Lukt het niet, dan komt de tekst in
-    // een tekstvak te staan zodat je hem zelf kunt selecteren -- liever een omweg dan een knop die
-    // stil niets doet.
-    let gelukt = false;
-    if(navigator.clipboard && window.isSecureContext){
-      try { await navigator.clipboard.writeText(tekst); gelukt = true; } catch(e){ gelukt = false; }
-    }
-    if(gelukt){
-      if(knop) knop.textContent = 'Gekopieerd (' + Math.round(tekst.length/1024) + ' KB)';
-      zeg('Plakken in RL/importeer_partij.py');
-    } else {
-      toonExportVak(tekst);
-      zeg('Kopieren lukte niet vanzelf -- selecteer de tekst hieronder en kopieer hem zelf.');
-    }
-  } catch(err){
-    zeg('Exporteren mislukte: ' + err.message);
-    console.warn('Baarden: exporteren van de partij mislukte.', err);
-  }
-}
-
-// Het klembord is een omweg met risico: de tekst reist door een venster, een editor of een
-// chatgesprek, en daar sneuvelt vroeg of laat een teken. Gecomprimeerde tekst is daar niet tegen
-// bestand -- een enkele verandering maakt de hele partij onleesbaar. Een bestand komt er ongeschonden
-// doorheen, en dat is de reden dat deze knop er staat.
+// De partij komt als BESTAND naar buiten, en alleen zo. Er stond hier eerst ook een knop die de
+// tekst naar het klembord kopieerde, maar die is weg: hij werd nooit gebruikt en het klembord is een
+// omweg met risico. De tekst reist dan door een venster, een editor of een chatgesprek, en daar
+// sneuvelt vroeg of laat een teken. Gecomprimeerde tekst is daar niet tegen bestand -- een enkel
+// veranderd teken maakt de hele partij onleesbaar, en dat is precies een keer gebeurd.
 async function bewaarPartij(){
   const uitleg = document.getElementById('exportPartijUitleg');
   try {
@@ -3701,22 +3674,6 @@ async function bewaarPartij(){
     if(uitleg) uitleg.textContent = 'Bewaren mislukte: ' + err.message;
     console.warn('Baarden: bewaren van de partij mislukte.', err);
   }
-}
-
-function toonExportVak(tekst){
-  let vak = document.getElementById('exportPartijVak');
-  if(!vak){
-    vak = document.createElement('textarea');
-    vak.id = 'exportPartijVak';
-    vak.className = 'export-vak';
-    vak.readOnly = true;
-    const rij = document.querySelector('.export-rij');
-    if(rij) rij.appendChild(vak); else document.body.appendChild(vak);
-  }
-  vak.value = tekst;
-  vak.style.display = 'block';
-  vak.focus();
-  vak.select();
 }
 
 // Bladwaarden die deze zoekbeurt al uitgerekend zijn. Alleen gevuld TIJDENS het zoeken (zie
