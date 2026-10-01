@@ -20,3 +20,13 @@ Geluiden bij de emoji-emotes (allemaal CC0 1.0, HQ-voorvertoning van freesound):
   emote-stoer.mp3  😎  "Victory (Rock Guitar Tapping)" door DeathToMayo  https://freesound.org/people/DeathToMayo/sounds/244022/      1,50 s
   emote-vuur.mp3   🔥  "Fire Burst Flash" door Za-Games                  https://freesound.org/people/Za-Games/sounds/539972/        0,76 s
 De volumes in index.html (EMOTES) brengen ze ongeveer even luid: het luidste stuk van elk geluid gemeten, en wat boven -18 dB uitkwam zachter gezet.
+
+verlies.mp3
+  "failfare.mp3" door Wagna
+  https://freesound.org/people/Wagna/sounds/242208/
+  Licentie: CC0 1.0. Een mislukte fanfare, de tegenhanger van winst.mp3; ongeveer 2,5 s hoorbaar.
+
+torencombo.mp3
+  "Level Up" door qubodup
+  https://freesound.org/people/qubodup/sounds/442943/
+  Licentie: CC0 1.0. Een opwaarts level-up-geluid van 1,7 s, voor een torenopwaardering met 3 of meer kaarten.

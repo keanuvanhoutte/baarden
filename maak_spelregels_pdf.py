@@ -22,7 +22,7 @@ import subprocess
 import sys
 import tempfile
 
-VERSIE = "v0.11"
+VERSIE = "v0.12"
 
 
 def _families():

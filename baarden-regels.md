@@ -1,6 +1,6 @@
 # Baarden — Spelregels
 
-> Status: **v0.11 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
+> Status: **v0.12 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
 
 ---
 
@@ -91,7 +91,7 @@ Het spel verloopt in **rondes**. Elke ronde heeft twee fases die **na elkaar** d
    - **Een kaart 1 vakje verschuiven** (horizontaal/verticaal) — naar een leeg vakje, of tegen een kaart van de tegenstander (zie sectie 8 voor de gevechtsregels).
    - **Toren opwaarderen** — met kaarten die orthogonaal naast je toren liggen en/of je hold-kaart (zie sectie 7).
 2. Daarna doet de **andere speler** zijn actie, volgens dezelfde regels.
-3. Er zijn nog **uitzonderingen** rond de **blok-kaarten** (zie sectie 6) — *nog toe te lichten.*
+3. **Passen mag als je geen beweegbare kaart hebt.** Ligt er van jou geen enkele kaart op het bord die kan bewegen (geen kaart, of enkel kaarten die gestapeld/geblokkeerd liggen of nergens heen kunnen), dan mag je je bewegingsbeurt **passen**. Vooral in het begin van het spel komt dit voor, bv. als je eerste kaart naar je toren of in hold ging. Je bent dan dus **niet verplicht** je blok-kaart op een kaart van de tegenstander te leggen. Dit blijft gelden, ronde na ronde, tot je weer een kaart op het bord hebt die kan bewegen. Passen is een keuze: de blok-kaart leggen, je hold-kaart plaatsen of je toren opwaarderen mag nog steeds. De blok-kaart zelf telt niet als beweegbare kaart.
 4. Zodra beide spelers hun actie gedaan hebben, is de ronde voorbij → terug naar 5.1, met de andere speler als beginnende speler.
 
 ---
@@ -110,7 +110,7 @@ De blok-kaart is eigenlijk de **joker** van elke speler. Elke speler heeft er **
 
 **Bevestigd** — De blok-kaart mag **nooit** op een torenvakje gelegd worden (ook niet op een opgewaardeerde torenlaag). Enkel gewone vijandelijke kaarten (of een vijandelijke blok-kaart) kunnen geblokkeerd worden. Een toren blijft dus altijd enkel via de gewone verover-regel (sectie 8.2) te grazen te nemen.
 
-**Bevestigde afhankelijkheid:** als een speler in fase 1 past (of anderszins nog geen enkele kaart op het bord heeft liggen), dan heeft hij in fase 2 mogelijk geen gewone kaart om te bewegen — de blok-kaart plaatsen is dan een prima alternatieve zet, zolang er een vijandelijke kaart op het bord staat om op te leggen. Is er ook dat niet (nog helemaal geen kaarten in het spel van geen van beide spelers), dan blijft het tijdelijke vangnet "geen zet mogelijk" nodig.
+**Bevestigde afhankelijkheid:** als een speler in fase 1 past (of anderszins nog geen enkele kaart op het bord heeft liggen), dan heeft hij in fase 2 mogelijk geen gewone kaart om te bewegen. De blok-kaart plaatsen mag dan, maar **moet niet**: sinds v0.12 mag hij in dat geval gewoon passen (sectie 5.2, punt 3). Dat vervangt ook het oude tijdelijke vangnet "geen zet mogelijk".
 
 ---
 
@@ -219,6 +219,7 @@ Geen — alle regels zijn bevestigd. Dit document beschrijft het volledige, afge
 
 ## 10. Wijzigingslog
 
+- **v0.12** — Nieuwe regel (sectie 5.2, punt 3): heb je in de bewegingsfase geen kaart op het bord die kan bewegen, dan mag je passen. Tot hiertoe was je in die situatie (vooral vroeg in het spel, als je eerste kaart naar je toren of in hold ging) verplicht je blok-kaart op een kaart van de tegenstander te leggen. Dit vervangt ook het tijdelijke vangnet "geen zet mogelijk" uit v0.4.2. De bot past zelf nog niet vrijwillig: hij speelt zoals hij getraind is en legt in die situatie nog zijn blok-kaart, wat binnen de regels blijft.
 - **v0.11** — Correctie (sectie 8.1a): bij het doorbreken van een gestapeld vakje **overleeft de aanvallende kaart altijd** en neemt ze het vakje in; de stapel die er lag gaat naar de gesneuvelden van de respectieve eigenaars en blijft dus herleefbaar. Tot hiertoe stond er dat alle betrokken kaarten volledig uit het spel verdwenen, inclusief je eigen aanvaller. Dat klopte niet met hoe het spel zich al die tijd gedroeg — enkel kaarten die je in je toren verwerkt verdwijnen écht. De regeltekst in het spel en de PDF waren op 13-09 al gecorrigeerd; dit document liep achter.
 - **v0.10** — Nieuwe regel (sectie 8.3): komt exact dezelfde stelling (zelfde bord, zelfde speler aan zet in dezelfde fase) voor de 3de keer voor, dan eindigt het spel in een gelijkspel, net als in schaken. De digitale versie waarschuwt subtiel na de 2de keer.
 - **v0.9.1** — Correctie (secties 8.1b en 8.2): een Aas kan een 2 niet slaan — geen gewone 2, en ook geen toren van waarde 2. De 2-tegen-Aas-uitzondering werkt dus in beide richtingen; voorheen liet het spel een Aas een 2 gewoon veroveren.
