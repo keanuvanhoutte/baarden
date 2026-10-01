@@ -479,6 +479,21 @@
   .emote-kiezer button:active{ background:rgba(190,159,65,.35); }
   .emote-kiezer.wacht button{ opacity:.45; }
   .board-row{ position:relative; }
+
+  /* Melding dat er een nieuwe versie online staat. Bewust in de gewone flow bovenaan en niet
+     zwevend: position:fixed bleek hier onbetrouwbaar (zie pinTopBar). */
+  .update-melding{
+    max-width:520px; margin:0 auto 8px auto; padding:9px 12px; border-radius:10px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:rgba(190,159,65,.18); border:1px solid var(--gold); color:var(--cream);
+    font-size:13px; line-height:1.35;
+  }
+  .update-melding button{
+    flex-shrink:0; margin:0; padding:7px 12px; font-size:13px; font-weight:bold;
+    background:var(--gold); color:var(--felt-dark); border:none; border-radius:8px;
+  }
+  /* Op smalle schermen zou de melding onder de knoppen 💬 en ☰ rechtsboven schuiven. */
+  @media (max-width:760px){ .update-melding{ margin-right:92px; } }
   .emote-ballon{
     position:absolute; left:50%; z-index:40; pointer-events:none;
     max-width:min(240px, 80vw); padding:7px 13px; border-radius:16px;
@@ -556,6 +571,11 @@
 </style>
 </head>
 <body>
+
+<div id="updateMelding" class="update-melding" role="status" style="display:none;">
+  <span id="updateTekst">Er is een nieuwe versie van Baarden.</span>
+  <button onclick="location.reload()">Vernieuwen</button>
+</div>
 
 <div id="settingsControls" style="display:none;">
   <button class="icon-btn" onclick="toggleSettings()" aria-label="Instellingen">☰</button>
@@ -5429,6 +5449,50 @@ function renderHint(){
     el.textContent = '';
   }
 }
+
+/* ======================= NIEUWE VERSIE ======================= */
+// Wie het spel open laat staan, of het als app op het beginscherm heeft, blijft anders op de oude
+// versie hangen: een telefoon haalt een open pagina niet uit zichzelf opnieuw op. Daarom kijken we
+// af en toe of de pagina op de server veranderd is. Firebase geeft elke versie een eigen ETag (een
+// vingerafdruk van de inhoud); verschilt die van de ETag bij het laden, dan staat er iets nieuws.
+// Er wordt nooit vanzelf herladen: midden in een partij tegen de AI zou je die kwijt zijn.
+let paginaVersie = null;
+let updateGemeld = false;
+
+// De eerste keer vragen we de versie uit de cache van de browser ('force-cache'): kwam deze pagina
+// zelf uit die cache, dan is dat de versie die nu draait, en niet wat er intussen op de server
+// staat. Anders zou een oude pagina meteen de nieuwe ETag als beginpunt nemen en nooit iets melden.
+async function haalPaginaVersie(modus){
+  const res = await fetch(location.pathname, { method:'HEAD', cache:modus });
+  if(!res.ok) return null;
+  return res.headers.get('ETag') || res.headers.get('Last-Modified');
+}
+
+function toonUpdateMelding(){
+  const tekst = document.getElementById('updateTekst');
+  // Een online partij gaat niet verloren: na het herladen kom je vanzelf terug in je kamer.
+  const partijWeg = state && !state.winner && (aiMode || soloMode);
+  tekst.textContent = partijWeg
+    ? 'Er is een nieuwe versie van Baarden. Vernieuw na deze partij; je huidige partij gaat anders verloren.'
+    : 'Er is een nieuwe versie van Baarden.';
+  document.getElementById('updateMelding').style.display = 'flex';
+}
+
+async function controleerUpdate(){
+  if(updateGemeld) return;
+  try{
+    if(!paginaVersie){ paginaVersie = await haalPaginaVersie('force-cache'); return; }
+    const nu = await haalPaginaVersie('no-store');
+    if(!nu) return;
+    if(nu !== paginaVersie){ updateGemeld = true; toonUpdateMelding(); }
+  } catch(e){ /* geen verbinding: volgende keer opnieuw */ }
+}
+
+controleerUpdate();
+// Elke 5 minuten, en meteen als je het spel terug opent vanuit de achtergrond: dat laatste is het
+// moment waarop een telefoon-app het vaakst op een oude versie blijkt te zitten.
+setInterval(() => { if(!document.hidden) controleerUpdate(); }, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) controleerUpdate(); });
 
 pasSkinToe(gekozenSkinId());
 autoRejoin();
