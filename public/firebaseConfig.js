@@ -297,6 +297,56 @@ window.firebaseDB = {
   },
 
   /**
+   * Stuur een emote naar de tegenstander.
+   *
+   * Emotes staan op een eigen pad (/rooms/CODE/emote), naast de spelstand en niet erin: elke zet
+   * schrijft de hele gameState met een PUT, en daarmee zou een emote die net verstuurd is weer
+   * gewist worden. Er staat altijd maar één emote; de volgende overschrijft de vorige. Het
+   * willekeurige nummer zorgt dat twee keer dezelfde emote na elkaar toch twee keer aankomt.
+   */
+  async sendEmote(roomCode, van, emoteId) {
+    const url = `${firebaseConfig.databaseURL}/rooms/${roomCode}/emote.json`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ van, id: emoteId, nr: Math.random().toString(36).slice(2, 10) })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return true;
+  },
+
+  /**
+   * Luister naar emotes in een kamer. De eerste melding van Firebase is wat er al stond toen je
+   * binnenkwam — een emote van vijf minuten geleden — en die slaan we over. Na een weggevallen
+   * verbinding stuurt Firebase die laatste emote opnieuw; het nummer herkent hem dan als oud.
+   * Lukt de live verbinding niet, dan zijn emotes er gewoon niet; anders dan de spelstand zijn ze
+   * niet nodig om te kunnen spelen, dus er is hier geen terugval op pollen.
+   */
+  onEmote(roomCode, callback) {
+    let eerste = true;
+    let laatsteNr = null;
+    let bron = null;
+    const verwerk = (event) => {
+      let bericht = null;
+      try { bericht = JSON.parse(event.data); } catch (e) { return; }
+      if (!bericht || bericht.path !== '/') return;
+      const emote = bericht.data && typeof bericht.data === 'object' ? bericht.data : null;
+      const oud = eerste || !emote || emote.nr === laatsteNr;
+      eerste = false;
+      if (emote) laatsteNr = emote.nr;
+      if (oud) return;
+      try { callback(emote); } catch (e) { console.error('Emote verwerken mislukt:', e); }
+    };
+    try {
+      bron = new EventSource(`${firebaseConfig.databaseURL}/rooms/${roomCode}/emote.json`);
+      bron.addEventListener('put', verwerk);
+    } catch (e) {
+      console.warn('Emotes niet beschikbaar:', e.message);
+    }
+    return () => { if (bron) { try { bron.close(); } catch (e) {} bron = null; } };
+  },
+
+  /**
    * Delete a room (cleanup)
    */
   async deleteRoom(roomCode) {

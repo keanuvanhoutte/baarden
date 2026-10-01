@@ -9,7 +9,8 @@
       "js/baarden_stellingen.json",
       "js/baarden_acties.json",
       "js/baarden_stefaanzetten.json",
-      "js/LEESMIJ.txt"
+      "js/LEESMIJ.txt",
+      "geluid/BRONNEN.txt"
     ],
     "headers": [
       {

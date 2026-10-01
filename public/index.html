@@ -461,6 +461,42 @@
   .settings-menu .help-row b{ color:var(--cream); }
   .settings-menu hr{ border:none; border-top:1px solid var(--line); margin:8px 0; }
 
+  /* Emotes: een knop naast ☰, enkel in een online kamer. Het keuzemenu hergebruikt de stijl van
+     het instellingenmenu; de ballonnetjes hangen boven het bord (de tegenstander, die zit altijd
+     aan de bovenkant) of eronder (jij). */
+  .emote-btn{ right:54px; font-size:17px; }
+  .emote-kiezer{ min-width:0; width:252px; padding:10px; }
+  .emote-kiezer .emote-rooster{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .emote-kiezer .emote-rooster button{
+    margin:0; padding:6px 0; font-size:24px; line-height:1.2; text-align:center;
+    background:rgba(0,0,0,.25); border:1px solid var(--line); border-radius:8px;
+  }
+  .emote-kiezer .emote-zinnen{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; }
+  .emote-kiezer .emote-zinnen button{
+    margin:0; padding:8px 4px; font-size:12.5px; text-align:center;
+    background:rgba(0,0,0,.25); border:1px solid var(--line); border-radius:8px; color:var(--cream);
+  }
+  .emote-kiezer button:active{ background:rgba(190,159,65,.35); }
+  .emote-kiezer.wacht button{ opacity:.45; }
+  .board-row{ position:relative; }
+  .emote-ballon{
+    position:absolute; left:50%; z-index:40; pointer-events:none;
+    max-width:min(240px, 80vw); padding:7px 13px; border-radius:16px;
+    background:var(--cream); color:var(--felt-dark); border:2px solid var(--gold);
+    font-family:'Trebuchet MS', Helvetica, sans-serif; font-weight:bold; font-size:15px;
+    text-align:center; white-space:nowrap; box-shadow:0 4px 12px rgba(0,0,0,.45);
+    opacity:0; transform:translateX(-50%) scale(.6); transition:opacity .18s, transform .18s;
+  }
+  .emote-ballon.groot{ font-size:34px; padding:2px 12px; line-height:1.25; }
+  .emote-ballon.boven{ top:-6px; }
+  .emote-ballon.onder{ bottom:-6px; }
+  .emote-ballon::after{
+    content:''; position:absolute; left:50%; margin-left:-7px; border:7px solid transparent;
+  }
+  .emote-ballon.boven::after{ top:100%; border-top-color:var(--gold); }
+  .emote-ballon.onder::after{ bottom:100%; border-bottom-color:var(--gold); }
+  .emote-ballon.zichtbaar{ opacity:1; transform:translateX(-50%) scale(1); }
+
   @media (max-width:380px){
     h1{ font-size:17px; letter-spacing:2px; }
     .panel{ padding:10px; }
@@ -523,8 +559,11 @@
 
 <div id="settingsControls" style="display:none;">
   <button class="icon-btn" onclick="toggleSettings()" aria-label="Instellingen">☰</button>
+  <button class="icon-btn emote-btn" id="emoteBtn" onclick="toggleEmoteKiezer()" aria-label="Emote sturen" style="display:none;">💬</button>
+  <div id="emoteKiezer" class="settings-menu emote-kiezer" style="display:none;"></div>
   <div id="settingsMenu" class="settings-menu" style="display:none;">
     <button class="secondary" onclick="resetRoom()">Nieuw spel in deze kamer</button>
+    <button class="secondary" id="geluidKnop" onclick="wisselGeluid()">🔊 Geluid: aan</button>
     <button class="secondary" onclick="backToMenu()">Terug naar menu</button>
   </div>
 </div>
@@ -698,6 +737,8 @@
   <div id="winnerBanner"></div>
 
   <div class="board-row">
+    <div id="emoteBoven" class="emote-ballon boven" aria-live="polite"></div>
+    <div id="emoteOnder" class="emote-ballon onder" aria-live="polite"></div>
     <div id="fallenLeft" class="fallen-col"></div>
     <div class="board" id="board"></div>
     <div id="fallenRight" class="fallen-col"></div>
@@ -755,11 +796,9 @@ window.addEventListener('unhandledrejection', function(ev){
 // position:fixed/sticky bleek onbetrouwbaar in deze omgeving. In plaats daarvan houden we de knop
 // met absolute positionering + een scroll-listener zelf op zijn plaats t.o.v. de zichtbare viewport.
 function pinTopBar(){
-  const btn = document.querySelector('.icon-btn');
-  const menu = document.getElementById('settingsMenu');
   const y = window.scrollY || window.pageYOffset || 0;
-  if(btn) btn.style.top = (y + 10) + 'px';
-  if(menu) menu.style.top = (y + 50) + 'px';
+  document.querySelectorAll('.icon-btn').forEach(btn => { btn.style.top = (y + 10) + 'px'; });
+  document.querySelectorAll('.settings-menu').forEach(menu => { menu.style.top = (y + 50) + 'px'; });
 }
 window.addEventListener('scroll', pinTopBar, {passive:true});
 window.addEventListener('resize', pinTopBar);
@@ -2437,11 +2476,185 @@ function startPolling(){
   } else {
     console.warn('Firebase niet geladen - polling uitgeschakeld');
   }
+  startEmotes();
 }
 
 function toggleSettings(){
   const el = document.getElementById('settingsMenu');
   el.style.display = (el.style.display==='none' || !el.style.display) ? 'block' : 'none';
+  document.getElementById('emoteKiezer').style.display = 'none';
+}
+
+/* ======================= EMOTES (alleen online) ======================= */
+// De keuze volgt wat in de grote online spellen de vaste snelchat is. Hearthstone heeft er zes:
+// Groeten, Goed gespeeld, Bedankt, Wow, Oeps en Dreigen. Clash Royale voegt Veel succes en Goede
+// partij toe. De emoji zijn de gevoelens die daar als plaatjes het meest gebruikt worden: lachen,
+// huilen, boos, duim, nadenken, gapen (verveling), stoer en vuur.
+// De ids gaan over de lijn, de tekst niet: zo kan een tekst later aangepast worden zonder dat een
+// oudere versie van het spel aan de andere kant iets onleesbaars krijgt.
+const EMOTES = [
+  { id:'lach',    tekst:'😂' },
+  { id:'huil',    tekst:'😭' },
+  { id:'boos',    tekst:'😡' },
+  { id:'duim',    tekst:'👍' },
+  { id:'denk',    tekst:'🤔' },
+  { id:'gaap',    tekst:'🥱' },
+  { id:'stoer',   tekst:'😎' },
+  { id:'vuur',    tekst:'🔥' },
+  { id:'hallo',   tekst:'Hallo! 👋' },
+  { id:'succes',  tekst:'Veel succes!' },
+  { id:'goedzet', tekst:'Goed gespeeld!' },
+  { id:'bedankt', tekst:'Bedankt!' },
+  { id:'wow',     tekst:'Wow!' },
+  { id:'oeps',    tekst:'Oeps!' },
+  { id:'dreig',   tekst:'Ik kom je toren halen!' },
+  { id:'gg',      tekst:'Goede partij!' },
+];
+const EMOTE_WACHTTIJD = 2500;   // zo snel kan je een volgende sturen: genoeg om niet te spammen
+const EMOTE_DUUR = 3000;        // zo lang blijft een ballonnetje staan
+let emoteUnsubscribe = null;
+let laatsteEmoteVerstuurd = 0;
+const emoteTimers = {};
+
+// Tik je naast het keuzemenu, dan gaat het dicht: anders hangt het over het bord terwijl je speelt.
+document.addEventListener('pointerdown', function(ev){
+  const kiezer = document.getElementById('emoteKiezer');
+  if(!kiezer || kiezer.style.display !== 'block') return;
+  if(kiezer.contains(ev.target) || document.getElementById('emoteBtn').contains(ev.target)) return;
+  kiezer.style.display = 'none';
+});
+
+function emotesBeschikbaar(){
+  return !soloMode && !aiMode && !!roomCode && !!myColor && !!window.firebaseDB;
+}
+
+function toggleEmoteKiezer(){
+  const el = document.getElementById('emoteKiezer');
+  document.getElementById('settingsMenu').style.display = 'none';
+  if(el.style.display === 'block'){ el.style.display = 'none'; return; }
+  if(!el.firstChild){
+    const emoji = EMOTES.filter(e => !/[a-z]/i.test(e.tekst));
+    const zinnen = EMOTES.filter(e => /[a-z]/i.test(e.tekst));
+    const rooster = document.createElement('div'); rooster.className = 'emote-rooster';
+    const lijst = document.createElement('div'); lijst.className = 'emote-zinnen';
+    const knop = e => {
+      const b = document.createElement('button');
+      b.textContent = e.tekst;
+      b.onclick = () => stuurEmote(e.id);
+      return b;
+    };
+    emoji.forEach(e => rooster.appendChild(knop(e)));
+    zinnen.forEach(e => lijst.appendChild(knop(e)));
+    el.appendChild(rooster); el.appendChild(lijst);
+  }
+  el.style.display = 'block';
+  pinTopBar();
+}
+
+async function stuurEmote(id){
+  const kiezer = document.getElementById('emoteKiezer');
+  kiezer.style.display = 'none';
+  if(!emotesBeschikbaar()) return;
+  const nu = Date.now();
+  if(nu - laatsteEmoteVerstuurd < EMOTE_WACHTTIJD) return;
+  laatsteEmoteVerstuurd = nu;
+  // Meteen zelf tonen: wachten op de echo van de server voelt traag, en die echo slaan we over.
+  toonEmote(myColor, id);
+  kiezer.classList.add('wacht');
+  setTimeout(() => kiezer.classList.remove('wacht'), EMOTE_WACHTTIJD);
+  try{ await window.firebaseDB.sendEmote(roomCode, myColor, id); }
+  catch(e){ console.warn('Emote sturen mislukt:', e); }
+}
+
+function toonEmote(kleur, id){
+  const emote = EMOTES.find(e => e.id === id);
+  if(!emote || (kleur !== 'red' && kleur !== 'black')) return;
+  // Wie onderaan zit, volgt boardIsFlipped(): je eigen kleur staat altijd onderaan.
+  const onderKleur = boardIsFlipped() ? 'red' : 'black';
+  const plek = kleur === onderKleur ? 'emoteOnder' : 'emoteBoven';
+  const el = document.getElementById(plek);
+  if(!el) return;
+  el.textContent = emote.tekst;
+  el.classList.toggle('groot', !/[a-z]/i.test(emote.tekst));
+  el.classList.remove('zichtbaar');
+  void el.offsetWidth;   // de animatie opnieuw laten starten als er al een ballonnetje stond
+  el.classList.add('zichtbaar');
+  clearTimeout(emoteTimers[plek]);
+  emoteTimers[plek] = setTimeout(() => el.classList.remove('zichtbaar'), EMOTE_DUUR);
+}
+
+function startEmotes(){
+  stopEmotes();
+  if(!roomCode || !window.firebaseDB || !window.firebaseDB.onEmote) return;
+  emoteUnsubscribe = window.firebaseDB.onEmote(roomCode, (emote) => {
+    if(emote.van === myColor) return;   // die toonden we al bij het versturen
+    toonEmote(emote.van, emote.id);
+  });
+}
+
+function stopEmotes(){
+  if(emoteUnsubscribe){ emoteUnsubscribe(); emoteUnsubscribe = null; }
+  ['emoteBoven','emoteOnder'].forEach(plek => {
+    clearTimeout(emoteTimers[plek]);
+    const el = document.getElementById(plek);
+    if(el) el.classList.remove('zichtbaar');
+  });
+  const kiezer = document.getElementById('emoteKiezer');
+  if(kiezer) kiezer.style.display = 'none';
+}
+
+/* ======================= GELUID BIJ WINST ======================= */
+// "Success Fanfare Trumpets" van FunWithSound op freesound.org (geluid 456966), CC0: vrij te
+// gebruiken zonder toestemming of naamsvermelding. Een korte koperfanfare van ongeveer drie
+// seconden — lang genoeg om als overwinning te voelen, kort genoeg om niet in de weg te zitten.
+// Je hoort hem als JIJ wint. Speel je solo op één toestel, dan wint er altijd iemand die aan het
+// toestel zit, dus dan hoor je hem altijd. Bij gelijkspel blijft het stil.
+const winGeluid = new Audio('geluid/winst.mp3');
+winGeluid.preload = 'auto';
+winGeluid.volume = 0.8;
+let geluidAan = true;
+try { geluidAan = localStorage.getItem('baarden:geluid') !== 'uit'; } catch(e){}
+let vorigeWinnaar;   // undefined = deze partij nog niet gezien; zo speelt een herlaadbeurt in een afgelopen partij geen fanfare
+
+function werkGeluidKnopBij(){
+  const knop = document.getElementById('geluidKnop');
+  if(knop) knop.textContent = geluidAan ? '🔊 Geluid: aan' : '🔇 Geluid: uit';
+}
+werkGeluidKnopBij();
+
+function wisselGeluid(){
+  geluidAan = !geluidAan;
+  try { localStorage.setItem('baarden:geluid', geluidAan ? 'aan' : 'uit'); } catch(e){}
+  werkGeluidKnopBij();
+  if(!geluidAan){ winGeluid.pause(); winGeluid.currentTime = 0; }
+}
+
+// iPhone en iPad spelen een geluid pas af nadat het één keer binnen een tik gestart is. Bij online
+// spel valt de winnende zet soms buiten een tik (hij komt via de server binnen), dus bij de eerste
+// tik op de pagina starten we het geluid één keer stil en zetten het meteen weer stop.
+document.addEventListener('pointerdown', function ontgrendel(){
+  document.removeEventListener('pointerdown', ontgrendel);
+  try{
+    winGeluid.muted = true;
+    const p = winGeluid.play();
+    const terug = () => { winGeluid.pause(); winGeluid.currentTime = 0; winGeluid.muted = false; };
+    if(p && p.then) p.then(terug, terug); else terug();
+  } catch(e){ winGeluid.muted = false; }
+});
+
+function controleerWinGeluid(){
+  const winnaar = state ? (state.winner || null) : undefined;
+  const nieuw = vorigeWinnaar === null && winnaar && winnaar !== 'draw';
+  vorigeWinnaar = winnaar;
+  if(!nieuw || !geluidAan) return;
+  const ikWon = soloMode || winnaar === myColor;
+  if(!ikWon) return;
+  try{
+    winGeluid.muted = false;
+    winGeluid.currentTime = 0;
+    const p = winGeluid.play();
+    if(p && p.catch) p.catch(e => console.warn('Winstgeluid niet afgespeeld:', e));
+  } catch(e){}
 }
 
 function openRules(){
@@ -2510,6 +2723,8 @@ function backToMenu(){
     firebaseUnsubscribe();
     firebaseUnsubscribe = null;
   }
+  stopEmotes();
+  vorigeWinnaar = undefined;
   // Clean up old polling timer if it exists
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
   // Ga je zelf terug naar het menu, dan wil je daar ook blijven: de onthouden kamer wissen, anders
@@ -4651,6 +4866,8 @@ function renderAll(){
     : state.winner==='draw'
       ? `<div class="winner-banner">🤝 Gelijkspel — dezelfde stelling kwam 3 keer voor.</div>${exportKnopHTML()}`
       : `<div class="winner-banner">🏆 ${label(state.winner)} heeft de toren veroverd!</div>${exportKnopHTML()}`;
+  controleerWinGeluid();
+  document.getElementById('emoteBtn').style.display = emotesBeschikbaar() ? 'flex' : 'none';
 
   renderBoard();
   renderFallenBadges();
