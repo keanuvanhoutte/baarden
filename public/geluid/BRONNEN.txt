@@ -3,3 +3,20 @@ winst.mp3
   https://freesound.org/people/FunWithSound/sounds/456966/
   Licentie: CC0 1.0 (publiek domein) - vrij te gebruiken, ook commercieel, zonder naamsvermelding.
   Dit is de HQ-voorvertoning (mp3, 44,1 kHz) van freesound; ongeveer 3 s hoorbaar, 4,4 s met uitsterven.
+
+emote.mp3
+  "Message Pop Sound" door ImAFoley
+  https://freesound.org/people/ImAFoley/sounds/537061/
+  Licentie: CC0 1.0 (publiek domein) - vrij te gebruiken, ook commercieel, zonder naamsvermelding.
+  Een korte mondpop van 0,06 s, HQ-voorvertoning van freesound.
+
+Geluiden bij de emoji-emotes (allemaal CC0 1.0, HQ-voorvertoning van freesound):
+  emote-lach.mp3   😂  "Very Cute Cartoon Laughter" door NicknameLarry   https://freesound.org/people/NicknameLarry/sounds/513983/   0,86 s
+  emote-huil.mp3   😭  "sadWhisle" door Splashdust                       https://freesound.org/people/Splashdust/sounds/84327/       0,93 s
+  emote-boos.mp3   😡  "Angry Grunt" door Rocotilos                      https://freesound.org/people/Rocotilos/sounds/341489/       0,71 s
+  emote-duim.mp3   👍  "[UI Sound] Approval - High Pitched Bell Synth" door GabFitzgerald  https://freesound.org/people/GabFitzgerald/sounds/625174/  0,77 s
+  emote-denk.mp3   🤔  "Hmm question" door esperar                       https://freesound.org/people/esperar/sounds/170768/         0,71 s
+  emote-gaap.mp3   🥱  "Yawn Male" door alegemaate                       https://freesound.org/people/alegemaate/sounds/364695/      0,86 s
+  emote-stoer.mp3  😎  "Victory (Rock Guitar Tapping)" door DeathToMayo  https://freesound.org/people/DeathToMayo/sounds/244022/      1,50 s
+  emote-vuur.mp3   🔥  "Fire Burst Flash" door Za-Games                  https://freesound.org/people/Za-Games/sounds/539972/        0,76 s
+De volumes in index.html (EMOTES) brengen ze ongeveer even luid: het luidste stuk van elk geluid gemeten, en wat boven -18 dB uitkwam zachter gezet.

@@ -115,20 +115,49 @@ window.firebaseDB = {
       catch (e) { console.error('Ophalen na wijziging mislukt:', e); }
     };
 
+    // Emotes reizen over dezelfde verbinding mee (zie onEmote).
+    const meldEmote = (emote, beginstand) => {
+      const luisteraars = this._emoteLuisteraars[roomCode];
+      if (luisteraars) luisteraars.forEach(f => f(emote && typeof emote === 'object' ? emote : null, beginstand));
+    };
+
+    // Er luistert één verbinding naar de hele kamer, niet een aparte per onderdeel. Firebase praat
+    // hier HTTP/1.1, en dan laat een browser maximaal zes verbindingen tegelijk naar dezelfde server
+    // toe, over alle tabbladen samen. Een blijvende verbinding houdt er één vast; met twee per
+    // tabblad liep het spel in drie tabbladen volledig vast, omdat er geen plek meer was om een zet
+    // te versturen.
     const verwerk = (event) => {
       if (!luistert) return;
       fouten = 0;
       let bericht = null;
       try { bericht = JSON.parse(event.data); } catch (e) { return; }
-      if (!bericht) return;
-      // Een PUT op de wortel bevat de volledige stand; dat is wat saveGameState schrijft, dus dit
-      // is het normale geval en er hoeft niets extra opgehaald te worden.
-      if (bericht.path === '/' && bericht.data && typeof bericht.data === 'object') meld(bericht.data);
-      else haalVolledigeStand();
+      if (!bericht || typeof bericht.path !== 'string') return;
+      const pad = bericht.path;
+      const data = bericht.data;
+      if (pad === '/') {
+        // De hele kamer: bij het verbinden, en opnieuw na een weggevallen verbinding.
+        const kamer = data && typeof data === 'object' ? data : {};
+        if (event.type === 'put') {
+          if (kamer.gameState && typeof kamer.gameState === 'object') meld(kamer.gameState);
+          meldEmote(kamer.emote, true);
+        } else {
+          if ('gameState' in kamer) haalVolledigeStand();
+          if ('emote' in kamer) meldEmote(kamer.emote, false);
+        }
+      } else if (pad === '/gameState' && event.type === 'put') {
+        // Een PUT van de volledige stand; dat is wat saveGameState schrijft, dus dit is het normale
+        // geval en er hoeft niets extra opgehaald te worden.
+        if (data && typeof data === 'object') meld(data);
+      } else if (pad === '/gameState' || pad.startsWith('/gameState/')) {
+        haalVolledigeStand();
+      } else if (pad === '/emote' && event.type === 'put') {
+        meldEmote(data, false);
+      }
+      // Zitplaatsen en metadata: daar hoeft het spel hier niets mee.
     };
 
     try {
-      const url = `${firebaseConfig.databaseURL}/rooms/${roomCode}/gameState.json`;
+      const url = `${firebaseConfig.databaseURL}/rooms/${roomCode}.json`;
       bron = new EventSource(url);
       bron.addEventListener('put', verwerk);
       bron.addEventListener('patch', verwerk);
@@ -316,34 +345,28 @@ window.firebaseDB = {
   },
 
   /**
-   * Luister naar emotes in een kamer. De eerste melding van Firebase is wat er al stond toen je
-   * binnenkwam — een emote van vijf minuten geleden — en die slaan we over. Na een weggevallen
-   * verbinding stuurt Firebase die laatste emote opnieuw; het nummer herkent hem dan als oud.
-   * Lukt de live verbinding niet, dan zijn emotes er gewoon niet; anders dan de spelstand zijn ze
-   * niet nodig om te kunnen spelen, dus er is hier geen terugval op pollen.
+   * Luister naar emotes in een kamer. Opent zelf geen verbinding: de emotes komen binnen over die
+   * van onStateChange (waarom: zie daar), dus die moet lopen. De beginstand is wat er al stond
+   * toen je binnenkwam — een emote van vijf minuten geleden — en die slaan we over. Na een
+   * weggevallen verbinding stuurt Firebase die laatste emote opnieuw; het nummer herkent hem dan
+   * als oud. Valt de spelstand terug op pollen, dan zijn emotes er gewoon niet: anders dan de
+   * spelstand zijn ze niet nodig om te kunnen spelen.
    */
+  _emoteLuisteraars: {},
   onEmote(roomCode, callback) {
-    let eerste = true;
     let laatsteNr = null;
-    let bron = null;
-    const verwerk = (event) => {
-      let bericht = null;
-      try { bericht = JSON.parse(event.data); } catch (e) { return; }
-      if (!bericht || bericht.path !== '/') return;
-      const emote = bericht.data && typeof bericht.data === 'object' ? bericht.data : null;
-      const oud = eerste || !emote || emote.nr === laatsteNr;
-      eerste = false;
+    const luisteraar = (emote, beginstand) => {
+      const oud = beginstand || !emote || emote.nr === laatsteNr;
       if (emote) laatsteNr = emote.nr;
       if (oud) return;
       try { callback(emote); } catch (e) { console.error('Emote verwerken mislukt:', e); }
     };
-    try {
-      bron = new EventSource(`${firebaseConfig.databaseURL}/rooms/${roomCode}/emote.json`);
-      bron.addEventListener('put', verwerk);
-    } catch (e) {
-      console.warn('Emotes niet beschikbaar:', e.message);
-    }
-    return () => { if (bron) { try { bron.close(); } catch (e) {} bron = null; } };
+    const luisteraars = this._emoteLuisteraars[roomCode] || (this._emoteLuisteraars[roomCode] = new Set());
+    luisteraars.add(luisteraar);
+    return () => {
+      luisteraars.delete(luisteraar);
+      if (!luisteraars.size && this._emoteLuisteraars[roomCode] === luisteraars) delete this._emoteLuisteraars[roomCode];
+    };
   },
 
   /**

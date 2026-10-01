@@ -2492,15 +2492,17 @@ function toggleSettings(){
 // huilen, boos, duim, nadenken, gapen (verveling), stoer en vuur.
 // De ids gaan over de lijn, de tekst niet: zo kan een tekst later aangepast worden zonder dat een
 // oudere versie van het spel aan de andere kant iets onleesbaars krijgt.
+// Elke emoji heeft een eigen geluidje dat erbij past; de zinnen delen het korte popje. Herkomst en
+// licentie (allemaal CC0) staan in geluid/BRONNEN.txt. De volumes trekken ze ongeveer gelijk.
 const EMOTES = [
-  { id:'lach',    tekst:'😂' },
-  { id:'huil',    tekst:'😭' },
-  { id:'boos',    tekst:'😡' },
-  { id:'duim',    tekst:'👍' },
-  { id:'denk',    tekst:'🤔' },
-  { id:'gaap',    tekst:'🥱' },
-  { id:'stoer',   tekst:'😎' },
-  { id:'vuur',    tekst:'🔥' },
+  { id:'lach',    tekst:'😂', geluid:'geluid/emote-lach.mp3',  volume:1 },
+  { id:'huil',    tekst:'😭', geluid:'geluid/emote-huil.mp3',  volume:0.8 },
+  { id:'boos',    tekst:'😡', geluid:'geluid/emote-boos.mp3',  volume:1 },
+  { id:'duim',    tekst:'👍', geluid:'geluid/emote-duim.mp3',  volume:0.5 },
+  { id:'denk',    tekst:'🤔', geluid:'geluid/emote-denk.mp3',  volume:0.5 },
+  { id:'gaap',    tekst:'🥱', geluid:'geluid/emote-gaap.mp3',  volume:1 },
+  { id:'stoer',   tekst:'😎', geluid:'geluid/emote-stoer.mp3', volume:0.5 },
+  { id:'vuur',    tekst:'🔥', geluid:'geluid/emote-vuur.mp3',  volume:0.35 },
   { id:'hallo',   tekst:'Hallo! 👋' },
   { id:'succes',  tekst:'Veel succes!' },
   { id:'goedzet', tekst:'Goed gespeeld!' },
@@ -2579,13 +2581,27 @@ function toonEmote(kleur, id){
   el.classList.remove('zichtbaar');
   void el.offsetWidth;   // de animatie opnieuw laten starten als er al een ballonnetje stond
   el.classList.add('zichtbaar');
+  speelEmoteGeluid(emote);
   clearTimeout(emoteTimers[plek]);
   emoteTimers[plek] = setTimeout(() => el.classList.remove('zichtbaar'), EMOTE_DUUR);
+}
+
+// Er is één audio-element voor alle emotes, dat telkens een ander bestand krijgt. Op iPhone en iPad
+// blijft een element dat één keer binnen een tik gestart is daarna mogen spelen, ook met een ander
+// bestand; acht losse elementen zou acht keer ontgrendelen vragen.
+function speelEmoteGeluid(emote){
+  const bron = emote.geluid || POP_GELUID;
+  if(emoteGeluid.getAttribute('src') !== bron) emoteGeluid.src = bron;
+  emoteGeluid.volume = emote.geluid ? emote.volume : 0.7;
+  speel(emoteGeluid);
 }
 
 function startEmotes(){
   stopEmotes();
   if(!roomCode || !window.firebaseDB || !window.firebaseDB.onEmote) return;
+  // De geluiden alvast ophalen, zodat de eerste emote niet stil blijft terwijl het bestand nog laadt.
+  // Enkel online: solo en tegen de AI zijn er geen emotes, dus ook niets te downloaden.
+  EMOTES.forEach(e => { if(e.geluid) fetch(e.geluid).catch(() => {}); });
   emoteUnsubscribe = window.firebaseDB.onEmote(roomCode, (emote) => {
     if(emote.van === myColor) return;   // die toonden we al bij het versturen
     toonEmote(emote.van, emote.id);
@@ -2614,6 +2630,14 @@ winGeluid.preload = 'auto';
 winGeluid.volume = 0.8;
 let geluidAan = true;
 try { geluidAan = localStorage.getItem('baarden:geluid') !== 'uit'; } catch(e){}
+// Bij elke emote, die van jezelf en die van de tegenstander, een geluidje. Voor de zinnen is dat
+// een kort popje: "Message Pop Sound" van ImAFoley op freesound.org (geluid 537061), ook CC0. Hij
+// duurt 0,06 s, dus hij stoort niet als er twee emotes snel na elkaar komen.
+// De emoji hebben elk een eigen geluid (zie EMOTES); het popje is voor de zinnen.
+const POP_GELUID = 'geluid/emote.mp3';
+const emoteGeluid = new Audio(POP_GELUID);
+emoteGeluid.preload = 'auto';
+emoteGeluid.volume = 0.7;
 let vorigeWinnaar;   // undefined = deze partij nog niet gezien; zo speelt een herlaadbeurt in een afgelopen partij geen fanfare
 
 function werkGeluidKnopBij(){
@@ -2629,17 +2653,30 @@ function wisselGeluid(){
   if(!geluidAan){ winGeluid.pause(); winGeluid.currentTime = 0; }
 }
 
+function speel(geluid){
+  if(!geluidAan) return;
+  try{
+    geluid.muted = false;
+    geluid.currentTime = 0;
+    const p = geluid.play();
+    if(p && p.catch) p.catch(e => console.warn('Geluid niet afgespeeld:', e));
+  } catch(e){}
+}
+
 // iPhone en iPad spelen een geluid pas af nadat het één keer binnen een tik gestart is. Bij online
 // spel valt de winnende zet soms buiten een tik (hij komt via de server binnen), dus bij de eerste
-// tik op de pagina starten we het geluid één keer stil en zetten het meteen weer stop.
+// tik op de pagina starten we elk geluid één keer stil en zetten het meteen weer stop. Hetzelfde
+// geldt voor een emote van de tegenstander: die komt ook binnen zonder dat jij tikt.
 document.addEventListener('pointerdown', function ontgrendel(){
   document.removeEventListener('pointerdown', ontgrendel);
-  try{
-    winGeluid.muted = true;
-    const p = winGeluid.play();
-    const terug = () => { winGeluid.pause(); winGeluid.currentTime = 0; winGeluid.muted = false; };
-    if(p && p.then) p.then(terug, terug); else terug();
-  } catch(e){ winGeluid.muted = false; }
+  [winGeluid, emoteGeluid].forEach(geluid => {
+    try{
+      geluid.muted = true;
+      const p = geluid.play();
+      const terug = () => { geluid.pause(); geluid.currentTime = 0; geluid.muted = false; };
+      if(p && p.then) p.then(terug, terug); else terug();
+    } catch(e){ geluid.muted = false; }
+  });
 });
 
 function controleerWinGeluid(){
@@ -2649,12 +2686,7 @@ function controleerWinGeluid(){
   if(!nieuw || !geluidAan) return;
   const ikWon = soloMode || winnaar === myColor;
   if(!ikWon) return;
-  try{
-    winGeluid.muted = false;
-    winGeluid.currentTime = 0;
-    const p = winGeluid.play();
-    if(p && p.catch) p.catch(e => console.warn('Winstgeluid niet afgespeeld:', e));
-  } catch(e){}
+  speel(winGeluid);
 }
 
 function openRules(){
