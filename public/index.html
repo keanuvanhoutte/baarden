@@ -44,11 +44,13 @@
     --card-frame:none;
     --card-font:inherit;
     --card-back:repeating-linear-gradient(135deg, #082a20, #082a20 3px, #10493a 3px, #10493a 6px);
+
+    --ui-scale:1;   /* schaal van de hele interface, door syncUiScale() uit de schermmaat berekend */
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html{ -webkit-text-size-adjust:100%; }
   body{
-    margin:0; min-height:100vh;
+    margin:0; min-height:calc(100vh / var(--ui-scale));
     background:var(--table-bg, radial-gradient(ellipse at top, var(--felt) 0%, var(--felt-dark) 70%));
     font-family:'Georgia', 'Iowan Old Style', serif;
     color:var(--cream);
@@ -56,6 +58,11 @@
     touch-action:manipulation;
     overscroll-behavior:contain;
   }
+  /* Het spel is ontworpen voor een telefoonkolom van ~390px breed. Op grotere (of kleinere) schermen
+     zoomt de hele body mee, zodat bord, kaarten, knoppen en tekst in verhouding blijven, net als bij
+     Torenroof. Viewport-eenheden binnen de body worden door zoom mee vergroot; vandaar de deling door
+     --ui-scale waar ze gebruikt worden. */
+  body{ zoom:var(--ui-scale); }
   h1{
     font-family:'Trebuchet MS', sans-serif;
     letter-spacing:3px;
@@ -326,7 +333,7 @@
   #lobby{ margin-top:0; }
   .lobby-wrap{
     display:flex; align-items:center; justify-content:center;
-    min-height:calc(100vh - 16px - 14px - env(safe-area-inset-bottom));
+    min-height:calc(100vh / var(--ui-scale) - 16px - 14px - env(safe-area-inset-bottom));
   }
   input[type=text]{
     background:var(--felt-dark); border:1px solid var(--gold); color:var(--cream);
@@ -366,7 +373,7 @@
   .board-row{ display:flex; align-items:center; justify-content:center; gap:8px; margin:4px 0; }
   .fallen-col{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; flex-shrink:0; width:44px; }
   .board{
-    width:100%; max-width:min(168px, 56vw); margin:0; display:grid;
+    width:100%; max-width:min(168px, calc(56vw / var(--ui-scale))); margin:0; display:grid;
     grid-template-columns:repeat(3,1fr);
     gap:4px;
     flex-shrink:0;
@@ -439,7 +446,7 @@
   .toast-msg{
     position:fixed; left:50%; bottom:22px; transform:translateX(-50%);
     background:rgba(15,15,15,.94); color:#fff; border:1px solid var(--gold);
-    padding:10px 16px; border-radius:8px; font-size:13px; max-width:85vw; text-align:center;
+    padding:10px 16px; border-radius:8px; font-size:13px; max-width:calc(85vw / var(--ui-scale)); text-align:center;
     z-index:3000; box-shadow:0 4px 14px rgba(0,0,0,.55); display:none;
   }
 
@@ -453,7 +460,7 @@
   .settings-menu{
     position:absolute; top:50px; right:10px; z-index:600;
     background:var(--felt-dark); border:1px solid var(--gold); border-radius:8px;
-    padding:12px; min-width:220px; max-width:78vw; box-shadow:0 4px 14px rgba(0,0,0,.6);
+    padding:12px; min-width:220px; max-width:calc(78vw / var(--ui-scale)); box-shadow:0 4px 14px rgba(0,0,0,.6);
   }
   .settings-menu button{ display:block; width:100%; text-align:left; margin:4px 0; }
   .settings-menu h4{ margin:10px 0 4px 0; color:var(--gold); font-size:12px; text-transform:uppercase; letter-spacing:.5px; }
@@ -480,10 +487,28 @@
   .emote-kiezer.wacht button{ opacity:.45; }
   .board-row{ position:relative; }
 
+  /* Liggende opstelling (door syncUiScale gekozen als het spel daar groter van in beeld komt):
+     beurt en winnaar over de volle breedte, het bord links, al de rest in een kolom rechts. Staand
+     telt de zijkolom niet mee en staat alles onder elkaar zoals altijd. */
+  .zij-kolom{ display:contents; }
+  /* !important omdat het script display:block rechtstreeks op het paneel zet; :not(...) zodat een
+     verborgen paneel (terug naar het menu) verborgen blijft. */
+  body[data-layout="liggend"] #gamePanel:not([style*="none"]){
+    display:grid !important; grid-template-columns:auto 340px; column-gap:22px; align-items:start;
+    width:max-content; max-width:none;
+  }
+  body[data-layout="liggend"] #gamePanel > :not(.board-row):not(.zij-kolom){ grid-column:1 / -1; }
+  body[data-layout="liggend"] .board-row{ margin:4px 0 0 0; }
+  /* In een kolom die zich naar zijn inhoud richt, zou width:100% het bord laten krimpen. */
+  body[data-layout="liggend"] .board{ width:168px; max-width:none; }
+  body[data-layout="liggend"] .zij-kolom{ display:flex; flex-direction:column; min-width:0; padding-top:14px; }
+  body[data-layout="liggend"] .zij-kolom .conn-status{ margin-top:auto; }
+  body[data-layout="liggend"] .zij-kolom > .panel{ max-width:none; }
+
   /* Melding dat er een nieuwe versie online staat. Bewust in de gewone flow bovenaan en niet
      zwevend: position:fixed bleek hier onbetrouwbaar (zie pinTopBar). */
   .update-melding{
-    max-width:520px; margin:0 auto 8px auto; padding:9px 12px; border-radius:10px;
+    max-width:min(520px, calc(100% - 184px)); margin:0 auto 8px auto; padding:9px 12px; border-radius:10px;
     display:flex; align-items:center; justify-content:space-between; gap:10px;
     background:rgba(190,159,65,.18); border:1px solid var(--gold); color:var(--cream);
     font-size:13px; line-height:1.35;
@@ -492,11 +517,11 @@
     flex-shrink:0; margin:0; padding:7px 12px; font-size:13px; font-weight:bold;
     background:var(--gold); color:var(--felt-dark); border:none; border-radius:8px;
   }
-  /* Op smalle schermen zou de melding onder de knoppen 💬 en ☰ rechtsboven schuiven. */
-  @media (max-width:760px){ .update-melding{ margin-right:92px; } }
+  /* De ruimte van 2 x 92px links en rechts houdt de melding weg van 💬 en ☰ rechtsboven. Geen media
+     query: die rekent in echte schermpixels, terwijl de interface meeschaalt. */
   .emote-ballon{
     position:absolute; left:50%; z-index:40; pointer-events:none;
-    max-width:min(240px, 80vw); padding:7px 13px; border-radius:16px;
+    max-width:min(240px, calc(80vw / var(--ui-scale))); padding:7px 13px; border-radius:16px;
     background:var(--cream); color:var(--felt-dark); border:2px solid var(--gold);
     font-family:'Trebuchet MS', Helvetica, sans-serif; font-weight:bold; font-size:15px;
     text-align:center; white-space:nowrap; box-shadow:0 4px 12px rgba(0,0,0,.45);
@@ -539,6 +564,9 @@
   .fallen-badge:active{ background:rgba(0,0,0,.5); }
 
   .rules-overlay{
+    /* Lange leestekst: die schaalt mee tot hoogstens 1,4x, anders wordt hij op een groot scherm
+       onhandig groot. --leesschaal is de terugrekening daarvoor (zie syncUiScale). */
+    zoom:var(--leesschaal, 1);
     position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:900;
     display:none; align-items:flex-start; justify-content:center;
     padding:16px; overflow-y:auto;
@@ -764,6 +792,9 @@
     <div class="board" id="board"></div>
     <div id="fallenRight" class="fallen-col"></div>
   </div>
+  <!-- Zijkolom: staand telt hij niet mee (display:contents) en staat alles gewoon onder het bord;
+       liggend komt hij rechts naast het bord (zie syncUiScale). -->
+  <div class="zij-kolom">
   <div class="reserve" id="reserve"></div>
   <div class="transient" id="transient"></div>
 
@@ -777,6 +808,7 @@
   <div id="connectionStatus" class="conn-status">
     <span id="connectionDot" class="conn-dot"></span>
     <span id="connectionText">Verbonden</span>
+  </div>
   </div>
 </div>
 
@@ -813,11 +845,61 @@ window.addEventListener('unhandledrejection', function(ev){
   }catch(e){}
 });
 
+/* ======================= SCHAAL VAN DE INTERFACE ======================= */
+// Het spel is getekend voor een telefoonkolom: UI_REF_W breed en UI_REF_H hoog (het spelscherm met
+// bord, hand en knoppen). De schaal is zo gekozen dat die kolom het scherm zo goed mogelijk vult,
+// zonder op een kleine telefoon onleesbaar klein te worden. Zelfde aanpak als bij Torenroof.
+// Op het spelscherm bestaat ook een liggende opstelling (bord links, de rest rechts) van
+// LAND_REF_W x LAND_REF_H; die wordt gekozen als het spel daarmee duidelijk groter in beeld komt.
+const UI_REF_W = 390, UI_REF_H = 700, UI_MIN = 0.8, UI_MAX = 2.6, LEES_MAX = 1.4;
+const LAND_REF_W = 800, LAND_REF_H = 480, LAND_MIN = 0.7;   // 800 laat links en rechts plaats voor 💬 en ☰
+let uiScale = 1;
+function syncUiScale(){
+  const w = window.innerWidth, h = window.innerHeight;
+  if(!w || !h) return;
+  const panel = document.getElementById('gamePanel');
+  const inSpel = !!panel && panel.style.display !== 'none';
+  const staand = Math.min(w / UI_REF_W, h / UI_REF_H);
+  const liggend = Math.min(w / LAND_REF_W, h / LAND_REF_H);
+  const kiesLiggend = inSpel && liggend > staand * 1.1;
+  if(kiesLiggend) document.body.dataset.layout = 'liggend';
+  else delete document.body.dataset.layout;
+  const s = kiesLiggend
+    ? Math.min(UI_MAX, Math.max(LAND_MIN, liggend))
+    : Math.min(UI_MAX, Math.max(UI_MIN, staand));
+  const nieuw = Math.round(s * 100) / 100;
+  if(nieuw !== uiScale){
+    uiScale = nieuw;
+    document.documentElement.style.setProperty('--ui-scale', uiScale);
+    document.documentElement.style.setProperty('--leesschaal', Math.min(uiScale, LEES_MAX) / uiScale);
+  }
+  if(typeof pinTopBar === 'function') pinTopBar();
+}
+window.addEventListener('resize', syncUiScale);
+window.addEventListener('orientationchange', syncUiScale);
+
+// Hoeveel schermpixels is één CSS-pixel binnen de meegeschaalde body? Gemeten in plaats van gelijk
+// gesteld aan uiScale: niet elke browser rapporteert getBoundingClientRect op dezelfde manier onder
+// zoom. Zo kloppen de vliegende kaarten en de vastgepinde knoppen overal.
+function schermFactor(){
+  const b = document.body;
+  const f = b && b.offsetWidth ? b.getBoundingClientRect().width / b.offsetWidth : 1;
+  return f > 0 ? f : 1;
+}
+// getBoundingClientRect, maar omgerekend naar CSS-pixels van de body: zo kan een kloon met
+// position:fixed in de body precies op die plek gezet worden.
+function cssRect(el){
+  const r = el.getBoundingClientRect(), f = schermFactor();
+  return { left:r.left/f, top:r.top/f, right:r.right/f, bottom:r.bottom/f, width:r.width/f, height:r.height/f };
+}
+syncUiScale();
+
 /* ======================= SETTINGS-KNOP: JS-gestuurd vastpinnen ======================= */
 // position:fixed/sticky bleek onbetrouwbaar in deze omgeving. In plaats daarvan houden we de knop
 // met absolute positionering + een scroll-listener zelf op zijn plaats t.o.v. de zichtbare viewport.
 function pinTopBar(){
-  const y = window.scrollY || window.pageYOffset || 0;
+  // scrollY is in schermpixels; de knoppen staan in de meegeschaalde body, dus terugrekenen.
+  const y = (window.scrollY || window.pageYOffset || 0) / schermFactor();
   document.querySelectorAll('.icon-btn').forEach(btn => { btn.style.top = (y + 10) + 'px'; });
   document.querySelectorAll('.settings-menu').forEach(menu => { menu.style.top = (y + 50) + 'px'; });
 }
@@ -1914,13 +1996,13 @@ function pieceInStack(stack, id){
 function offBoardAnchor(color){
   const boardEl = document.getElementById('board');
   if(!boardEl) return null;
-  const r = boardEl.getBoundingClientRect();
+  const r = cssRect(boardEl);
   if(!r.width) return null;
   // Aan welke kant van het scherm ligt deze kleur nu? Uit de DOM gelezen i.p.v. uit de kleur,
   // zodat dit vanzelf blijft kloppen met een gedraaid bord (zie boardIsFlipped()).
   const towerEl = document.querySelector(`.cell[data-cell="${towerCellOf(color)}"]`);
   const atTop = towerEl
-    ? towerEl.getBoundingClientRect().top < r.top + r.height/2
+    ? cssRect(towerEl).top < r.top + r.height/2
     : color === 'red';
   const size = (r.width/3) * 0.78;
   const a = document.createElement('div');
@@ -2810,6 +2892,7 @@ function backToMenu(){
   }
   stopEmotes();
   vorigeWinnaar = undefined;
+  setTimeout(syncUiScale, 0);   // na het verbergen van het spelscherm: terug naar de staande schaal
   vorigeTorenLagen = {};
   // Clean up old polling timer if it exists
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
@@ -2925,8 +3008,8 @@ function chainLabel(chain){ return chain.map(i=>cardText(i.card)).join(', '); }
 
 async function animateCardFly(sourceEl, destEl, card){
   if(!sourceEl || !destEl){ await sleep(100); return; }
-  const srcRect = sourceEl.getBoundingClientRect();
-  const dstRect = destEl.getBoundingClientRect();
+  const srcRect = cssRect(sourceEl);
+  const dstRect = cssRect(destEl);
   const clone = document.createElement('div');
   clone.className = 'card-face ' + suitColor(card.suit);
   clone.innerHTML = `${card.rank}<br>${suitSymbol(card.suit)}`;
@@ -2954,8 +3037,8 @@ async function animateCardFly(sourceEl, destEl, card){
 // volledig zichtbaar (geen verkleinen/vervagen) en glijdt gewoon naar zijn nieuwe vakje.
 async function animateCardSlide(sourceEl, destEl, card){
   if(!sourceEl || !destEl){ await sleep(100); return; }
-  const srcRect = sourceEl.getBoundingClientRect();
-  const dstRect = destEl.getBoundingClientRect();
+  const srcRect = cssRect(sourceEl);
+  const dstRect = cssRect(destEl);
   const clone = document.createElement('div');
   clone.className = 'card-face ' + suitColor(card.suit);
   clone.innerHTML = `${card.rank}<br>${suitSymbol(card.suit)}`;
@@ -3011,8 +3094,8 @@ async function animateBlockCard(color, fromCell, toCell){
     : document.querySelector(`.block-face[data-block-color="${color}"]`);
   const dstEl = document.querySelector(`.cell[data-cell="${toCell}"]`);
   if(!srcEl || !dstEl){ await sleep(120); return; }
-  const srcRect = srcEl.getBoundingClientRect();
-  const dstRect = dstEl.getBoundingClientRect();
+  const srcRect = cssRect(srcEl);
+  const dstRect = cssRect(dstEl);
   const clone = document.createElement('div');
   clone.className = 'block-face ' + color;
   clone.textContent = 'BLOK';
@@ -4935,6 +5018,7 @@ function showToast(msg, duration=3500){
 /* ======================= RENDER ======================= */
 function renderAll(){
   if(!state) return;
+  syncUiScale();   // liggend of staand hangt ervan af of het spelscherm open is
 
   // Kwam deze stelling al 2 keer voor, dan een kleine waarschuwing: nog één keer en het is gelijkspel.
   const herhaling = state.winner ? 0 : positionCount(state);
