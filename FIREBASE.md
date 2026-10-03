@@ -17,10 +17,14 @@ inhoud van `public/` live. Je kan de workflow ook handmatig starten via
 Handmatig `firebase deploy` draaien blijft gewoon werken; de workflow is een
 aanvulling, geen vervanging.
 
-De database rules worden **niet** door de workflow uitgerold — er staat geen
-`database.rules.json` in deze repo, die worden in de console beheerd. Wil je ze
-mee in versiebeheer, zet ze dan in `firebase.json` onder `"database"` en breid
-de deploy-stap uit naar `--only hosting,database`.
+De database rules (`database.rules.json`) en de inlogmethodes (`"auth"` in
+`firebase.json`) staan in de repo, maar worden **niet** door de workflow
+uitgerold: die publiceert enkel hosting. Pas je een van beide aan, rol ze dan
+zelf uit:
+
+```bash
+firebase deploy --only database,auth
+```
 
 ### Het service-account secret
 
@@ -89,9 +93,28 @@ predeploy-hook de kopie maken.
 |---|---|
 | `public/index.html` | Wat Hosting serveert |
 | `public/firebaseConfig.js` | Firebase-config en database-helpers |
-| `firebase.json` | Hosting-configuratie |
+| `public/account.js` | Inloggen met Google en XP bijhouden |
+| `firebase.json` | Hosting-, database- en auth-configuratie |
+| `database.rules.json` | Databaseregels |
 | `.firebaserc` | Welk Firebase-project actief is (`baarden-f45cf`) |
 | `.github/workflows/firebase-deploy.yml` | Automatische deploy bij elke push naar `main` |
+
+## Accounts (inloggen met Google)
+
+Spelers kunnen optioneel inloggen met Google; anonieme accounts en wachtwoorden
+zijn er bewust niet. `public/account.js` doet het inloggen (Firebase Auth SDK)
+en houdt de XP bij onder `/spelers/{uid}` in de database.
+
+- **Regels:** `/rooms` staat open zoals altijd; `/spelers/{uid}` kan enkel de
+  ingelogde speler zelf lezen en schrijven.
+- **Valsspelen:** de browser kent zichzelf XP toe. Wie de console kent, kan
+  zijn eigen XP opdrijven. Voor cosmetische beloningen volstaat dat; voor een
+  ranglijst of iets betalends moet een Cloud Function de XP toekennen.
+- **Toegestane domeinen** (Authentication → Settings): `localhost`,
+  `baarden-f45cf.web.app` en `baarden-f45cf.firebaseapp.com`. Komt er een eigen
+  domein bij, voeg het daar toe én aan `authorizedRedirectUris` in
+  `firebase.json` (`https://<domein>/__/auth/handler`), en zet het in
+  `EIGEN_DOMEINEN` in `account.js`.
 
 ## Lokaal testen
 

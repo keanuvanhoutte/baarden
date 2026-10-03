@@ -19,6 +19,9 @@
 <meta name="apple-mobile-web-app-title" content="Baarden">
 <!-- Firebase SDK -->
 <script src="firebaseConfig.js"></script>
+<!-- Inloggen met Google en XP (zie account.js). Een module laadt pas na de rest; lukt dat niet, dan
+     speelt alles gewoon zonder account. -->
+<script type="module" src="account.js"></script>
 <style>
   :root{
     --felt:#0b3d2e;
@@ -100,6 +103,41 @@
     border-radius:999px; font-weight:bold; box-shadow:none; opacity:.85;
   }
   .menu-btn-klein:active{ transform: translateY(1px); }
+  /* Account: bovenaan het menu. Niet ingelogd een knop, ingelogd je naam, niveau en XP-balk. */
+  .account-balk{ margin:0 0 14px 0; }
+  .account-balk:empty{ display:none; }
+  .google-knop{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; margin:0; padding:10px 14px; font-size:14px;
+    background:#fff; color:#1f1f1f; border:1px solid #747775; border-radius:999px;
+    font-family:Roboto, Arial, sans-serif; font-weight:500;
+  }
+  .google-knop svg{ width:18px; height:18px; flex-shrink:0; }
+  .google-knop:active{ transform:translateY(1px); }
+  .account-uitleg{ text-align:center; font-size:12px; opacity:.7; margin-top:6px; }
+  .account-fout{ text-align:center; font-size:12px; color:#f0a3a0; margin-top:6px; }
+  .account-kaart{
+    display:flex; align-items:center; gap:12px;
+    background:rgba(0,0,0,.25); border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+  }
+  .account-foto{
+    width:40px; height:40px; border-radius:50%; flex-shrink:0; object-fit:cover;
+    border:2px solid var(--gold); background:var(--felt-dark);
+    display:flex; align-items:center; justify-content:center; color:var(--gold); font-weight:bold;
+  }
+  .account-midden{ flex:1; min-width:0; }
+  .account-naam{ font-weight:bold; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .account-niveau{ color:var(--gold); font-size:12px; font-weight:bold; margin-top:1px; }
+  .xp-balk{ height:6px; border-radius:3px; background:rgba(0,0,0,.4); margin-top:5px; overflow:hidden; }
+  .xp-balk > div{ height:100%; background:linear-gradient(90deg, #d3b45e, var(--gold)); transition:width .4s; }
+  .xp-tekst{ font-size:10px; opacity:.65; margin-top:3px; }
+  .account-uit{
+    flex-shrink:0; margin:0; padding:6px 10px; min-height:0; font-size:11px;
+    background:transparent; color:var(--cream); border:1px solid rgba(190,159,65,.45); border-radius:999px; opacity:.8;
+  }
+  /* "+30 XP" onder de winnaarsbanner. */
+  .xp-melding{ text-align:center; font-size:14px; color:var(--gold); font-weight:bold; margin:2px 0 6px 0; }
+  .xp-melding.zacht{ color:var(--cream); font-weight:normal; font-size:12px; opacity:.7; }
   .menu-subpanel{
     background:rgba(0,0,0,.25); border:1px solid var(--line); border-radius:10px;
     padding:14px; margin:0 0 8px 0;
@@ -703,6 +741,8 @@
     <div class="menu-name">Baarden</div>
     <div class="menu-suits"><span class="red">♥ ♦</span><span class="black">♠ ♣</span></div>
   </div>
+
+  <div id="accountBalk" class="account-balk"></div>
 
   <div id="menuButtons">
     <button class="menu-btn" onclick="openMenuPanel('multiplayer')">🌐 Multiplayer</button>
@@ -2804,6 +2844,119 @@ function controleerWinGeluid(){
   else if(myColor) speel(verliesGeluid);   // een toeschouwer verliest niets
 }
 
+/* ======================= ACCOUNT EN XP =======================
+   Het inloggen en het bijhouden zelf zitten in account.js; hier staat enkel wat het spel ervan toont:
+   de balk bovenaan het menu en de "+XP"-regel onder de winnaarsbanner. */
+let vorigeUitslagXp;   // zelfde idee als vorigeWinnaar: undefined = deze partij nog niet gezien
+let partijXp = null;   // { xp, niveauOmhoog }, { geenAccount:true }, of null als er niets te melden is
+
+// Kent één keer per partij XP toe, op het moment dat ze eindigt. Wie een al afgelopen partij
+// binnenkomt of herlaadt, ziet het einde nooit "gebeuren" en krijgt dus ook geen tweede keer XP.
+function controleerPartijEinde(){
+  const winnaar = state ? (state.winner || null) : undefined;
+  const nieuw = vorigeUitslagXp === null && !!winnaar;
+  vorigeUitslagXp = winnaar;
+  if(!winnaar){ partijXp = null; return; }
+  if(!nieuw) return;
+  // Solo (beide kleuren zelf) en meekijken tellen niet.
+  const modus = aiMode ? 'ai' : (!soloMode && roomCode && myColor) ? 'online' : null;
+  if(!modus) return;
+  const uitslag = winnaar === 'draw' ? 'gelijk' : winnaar === myColor ? 'winst' : 'verlies';
+  const account = window.baardenAccount;
+  if(!account){ partijXp = null; return; }
+  partijXp = account.gebruiker
+    ? account.partijAfgelopen({ modus, uitslag, aiNiveau })
+    : { geenAccount: true };
+}
+
+function xpMeldingHTML(){
+  if(!partijXp) return '';
+  if(partijXp.geenAccount) return '<div class="xp-melding zacht">Log in via het menu om XP te verdienen.</div>';
+  return `<div class="xp-melding">+${partijXp.xp} XP${partijXp.niveauOmhoog ? ` · Niveau ${partijXp.niveauOmhoog} bereikt! 🎉` : ''}</div>`;
+}
+
+// De officiële "G" van Google; hun richtlijnen vragen dit logo op een inlogknop.
+const GOOGLE_G = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+
+function renderAccount(){
+  const el = document.getElementById('accountBalk');
+  if(!el) return;
+  const account = window.baardenAccount;
+  el.innerHTML = '';
+  if(!account) return;   // account.js niet (of nog niet) geladen: geen balk, spelen kan gewoon
+
+  if(!account.gebruiker){
+    const knop = document.createElement('button');
+    knop.className = 'google-knop';
+    knop.disabled = account.bezig;
+    knop.innerHTML = GOOGLE_G;
+    const tekst = document.createElement('span');
+    tekst.textContent = account.bezig ? 'Bezig met inloggen…' : 'Inloggen met Google';
+    knop.appendChild(tekst);
+    knop.onclick = () => account.inloggen();
+    el.appendChild(knop);
+    const onder = document.createElement('div');
+    onder.className = account.fout ? 'account-fout' : 'account-uitleg';
+    onder.textContent = account.fout || 'Verdien XP en bewaar je voortgang op elk toestel.';
+    el.appendChild(onder);
+    return;
+  }
+
+  const g = account.gebruiker;
+  const kaart = document.createElement('div');
+  kaart.className = 'account-kaart';
+
+  // De Google-foto, of anders de eerste letter van je naam.
+  const letter = () => {
+    const d = document.createElement('div');
+    d.className = 'account-foto';
+    d.textContent = (g.naam || '?').trim().charAt(0).toUpperCase();
+    return d;
+  };
+  if(g.foto){
+    const img = document.createElement('img');
+    img.className = 'account-foto';
+    img.alt = '';
+    img.referrerPolicy = 'no-referrer';   // Google weigert profielfoto's soms met een verwijzer erbij
+    img.src = g.foto;
+    img.onerror = () => img.replaceWith(letter());
+    kaart.appendChild(img);
+  } else {
+    kaart.appendChild(letter());
+  }
+
+  const midden = document.createElement('div');
+  midden.className = 'account-midden';
+  const naam = document.createElement('div');
+  naam.className = 'account-naam';
+  naam.textContent = g.naam;
+  midden.appendChild(naam);
+  const p = account.profiel;
+  if(p){
+    const n = account.niveauVan(p.xp);
+    midden.insertAdjacentHTML('beforeend',
+      `<div class="account-niveau">Niveau ${n.niveau}</div>` +
+      `<div class="xp-balk"><div style="width:${Math.round(100 * n.inNiveau / n.perNiveau)}%"></div></div>` +
+      `<div class="xp-tekst">${n.inNiveau} / ${n.perNiveau} XP</div>`);
+  } else {
+    const laden = document.createElement('div');
+    laden.className = account.fout ? 'account-fout' : 'xp-tekst';
+    laden.style.textAlign = 'left';
+    laden.textContent = account.fout || 'Voortgang laden…';
+    midden.appendChild(laden);
+  }
+  kaart.appendChild(midden);
+
+  const uit = document.createElement('button');
+  uit.className = 'account-uit';
+  uit.textContent = 'Uitloggen';
+  uit.onclick = () => account.uitloggen();
+  kaart.appendChild(uit);
+
+  el.appendChild(kaart);
+}
+window.addEventListener('baarden-account', renderAccount);
+
 // Een opwaardering legt de kaarten één voor één op de toren, en tussendoor wordt er hertekend (en
 // online soms ook opgeslagen). Daarom tellen we pas als de opwaardering helemaal klaar is: zolang
 // state.towerBuild loopt voor die kleur, blijft het oude aantal staan.
@@ -2892,6 +3045,8 @@ function backToMenu(){
   }
   stopEmotes();
   vorigeWinnaar = undefined;
+  vorigeUitslagXp = undefined;
+  partijXp = null;
   setTimeout(syncUiScale, 0);   // na het verbergen van het spelscherm: terug naar de staande schaal
   vorigeTorenLagen = {};
   // Clean up old polling timer if it exists
@@ -5032,10 +5187,11 @@ function renderAll(){
   // en gooit nooit, dus dit kan een partij niet verstoren.
   if((aiMode || soloMode) && window.BaardenOpname && BaardenOpname.bezig()) BaardenOpname.leg(state);
 
+  controleerPartijEinde();
   document.getElementById('winnerBanner').innerHTML = !state.winner ? ''
     : state.winner==='draw'
-      ? `<div class="winner-banner">🤝 Gelijkspel — dezelfde stelling kwam 3 keer voor.</div>${exportKnopHTML()}`
-      : `<div class="winner-banner">🏆 ${label(state.winner)} heeft de toren veroverd!</div>${exportKnopHTML()}`;
+      ? `<div class="winner-banner">🤝 Gelijkspel — dezelfde stelling kwam 3 keer voor.</div>${xpMeldingHTML()}${exportKnopHTML()}`
+      : `<div class="winner-banner">🏆 ${label(state.winner)} heeft de toren veroverd!</div>${xpMeldingHTML()}${exportKnopHTML()}`;
   controleerTorenCombo();
   controleerWinGeluid();
   document.getElementById('emoteBtn').style.display = emotesBeschikbaar() ? 'flex' : 'none';

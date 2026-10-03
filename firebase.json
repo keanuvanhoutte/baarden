@@ -41,5 +41,19 @@
         ]
       }
     ]
+  },
+  "database": {
+    "rules": "database.rules.json"
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Baarden",
+        "supportEmail": "keanu.vanhoutte@gmail.com",
+        "authorizedRedirectUris": [
+          "https://baarden-f45cf.web.app/__/auth/handler"
+        ]
+      }
+    }
   }
 }
