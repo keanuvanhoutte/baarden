@@ -156,6 +156,23 @@ window.baardenAccount = {
     bezig = true; fout = null; meld();
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
+    // Als app op het beginscherm geopend kan een pop-up niet: de telefoon opent hem dan in de gewone
+    // browser, en zodra dat venster na het inloggen sluit, toont de browser het tabblad dat daar al
+    // openstond (bv. een ander spel), en komt de login nooit terug in Baarden. Daarom daar meteen
+    // doorsturen: de app gaat zelf naar Google en komt ingelogd terug. Dat werkt omdat het inlog-
+    // adres op hetzelfde domein staat als het spel (zie authDomain bovenaan).
+    const alsApp = window.matchMedia('(display-mode: standalone)').matches
+      || window.matchMedia('(display-mode: fullscreen)').matches
+      || window.navigator.standalone === true;
+    if(alsApp){
+      try{ await signInWithRedirect(auth, provider); return; }
+      catch(e){
+        console.error('Inloggen via doorsturen mislukt:', e);
+        fout = 'Inloggen is niet gelukt. Probeer het opnieuw.';
+        bezig = false; meld();
+        return;
+      }
+    }
     try{
       await signInWithPopup(auth, provider);
     } catch(e){
