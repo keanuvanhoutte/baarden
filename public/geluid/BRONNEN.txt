@@ -30,3 +30,8 @@ torencombo.mp3
   "Level Up" door qubodup
   https://freesound.org/people/qubodup/sounds/442943/
   Licentie: CC0 1.0. Een opwaarts level-up-geluid van 1,7 s, voor een torenopwaardering met 3 of meer kaarten.
+
+Geluiden bij de battlepass-emotes (zelf gemaakt met een klein Python-script, dus geen licentie van derden):
+  emote-clown.wav  🤡  twee keer "toet" van een clownstoeter: twee licht valse zaagtanden door een filter, 0,50 s
+  emote-rip.wav    💀  droevige trombone, "wah wah wah waaah": vier dalende noten met een filter dat open en dicht gaat, 1,89 s
+  emote-sniper.wav  🎯  Scherpschutter (tier 25): telescoopklik, schot en een cartoonachtige afketser "pjiuuw", 0,86 s

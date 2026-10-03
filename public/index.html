@@ -19,6 +19,9 @@
 <meta name="apple-mobile-web-app-title" content="Baarden">
 <!-- Firebase SDK -->
 <script src="firebaseConfig.js"></script>
+<!-- Inloggen met Google en XP (zie account.js). Een module laadt pas na de rest; lukt dat niet, dan
+     speelt alles gewoon zonder account. -->
+<script type="module" src="account.js"></script>
 <style>
   :root{
     --felt:#0b3d2e;
@@ -100,6 +103,152 @@
     border-radius:999px; font-weight:bold; box-shadow:none; opacity:.85;
   }
   .menu-btn-klein:active{ transform: translateY(1px); }
+  /* Account: bovenaan het menu. Niet ingelogd een knop, ingelogd je naam, niveau en XP-balk. */
+  .account-balk{ margin:0 0 14px 0; }
+  .account-balk:empty{ display:none; }
+  .google-knop{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; margin:0; padding:10px 14px; font-size:14px;
+    background:#fff; color:#1f1f1f; border:1px solid #747775; border-radius:999px;
+    font-family:Roboto, Arial, sans-serif; font-weight:500;
+  }
+  .google-knop svg{ width:18px; height:18px; flex-shrink:0; }
+  .google-knop:active{ transform:translateY(1px); }
+  .account-uitleg{ text-align:center; font-size:12px; opacity:.7; margin-top:6px; }
+  .account-fout{ text-align:center; font-size:12px; color:#f0a3a0; margin-top:6px; }
+  /* Ingelogd: geen eigen kader, enkel een dun lijntje eronder. De XP-balk is een haarlijn met een
+     zachte gloed, zodat hij bij de rest van het menu past in plaats van de aandacht te trekken. */
+  .account-kaart{
+    display:flex; align-items:center; gap:12px;
+    padding:0 2px 12px 2px; border-bottom:1px solid var(--line);
+  }
+  .account-foto{
+    width:36px; height:36px; border-radius:50%; flex-shrink:0; object-fit:cover;
+    border:1.5px solid rgba(190,159,65,.75); background:var(--felt-dark);
+    display:flex; align-items:center; justify-content:center; color:var(--gold); font-weight:bold; font-size:15px;
+  }
+  .account-midden{ flex:1; min-width:0; }
+  .account-boven{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .account-naam{ font-weight:bold; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .account-uit{
+    flex-shrink:0; margin:0; padding:0; min-height:0; font-size:11px; font-weight:normal;
+    background:none; border:none; color:var(--cream); opacity:.45;
+    text-decoration:underline; text-underline-offset:2px;
+  }
+  .xp-rij{ display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .xp-tier{
+    font-size:10px; letter-spacing:1.2px; text-transform:uppercase; font-weight:bold;
+    color:var(--gold); white-space:nowrap;
+  }
+  .xp-balk{ flex:1; height:3px; border-radius:2px; background:rgba(242,234,217,.12); overflow:hidden; }
+  .xp-balk > div{
+    height:100%; border-radius:2px; background:var(--gold);
+    box-shadow:0 0 6px rgba(190,159,65,.7); transition:width .5s ease;
+  }
+  .xp-getal{ font-size:10px; opacity:.5; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .xp-tekst{ font-size:10px; opacity:.6; margin-top:5px; }
+  /* "+30 XP" onder de winnaarsbanner. */
+  .xp-melding{ text-align:center; font-size:14px; color:var(--gold); font-weight:bold; margin:2px 0 6px 0; }
+  .xp-melding.zacht{ color:var(--cream); font-weight:normal; font-size:12px; opacity:.7; }
+  .xp-melding .nieuw{ display:block; font-size:12px; color:var(--cream); font-weight:normal; margin-top:2px; }
+
+  /* Battlepass-knop in het menu: dezelfde maat als de hoofdknoppen, maar donker met een gouden rand,
+     zodat hij opvalt zonder met Multiplayer en Solo te concurreren. */
+  .menu-btn.bp-knop{
+    background:linear-gradient(180deg, rgba(190,159,65,.20), rgba(190,159,65,.05));
+    color:var(--gold); border:1px solid rgba(190,159,65,.75);
+    box-shadow:0 3px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.07);
+  }
+  .bp-knop-tier{
+    font-size:11px; letter-spacing:.8px; padding:2px 8px; border-radius:999px;
+    background:var(--gold); color:var(--felt-dark);
+  }
+
+  /* Het battlepass-scherm */
+  .bp-kop{ display:flex; align-items:center; gap:14px; margin:4px 0 14px 0; }
+  .bp-tiergetal{ text-align:center; flex-shrink:0; width:62px; }
+  .bp-tiergetal .label{ font-size:9px; letter-spacing:1.5px; text-transform:uppercase; opacity:.6; }
+  .bp-tiergetal .getal{ font-size:30px; font-weight:bold; color:var(--gold); line-height:1.05; font-family:'Trebuchet MS', Helvetica, sans-serif; }
+  .bp-tiergetal .van{ font-size:10px; opacity:.5; }
+  .bp-voortgang{ flex:1; min-width:0; }
+  .bp-voortgang .xp-balk{ height:4px; }
+  .bp-voortgang .xp-tekst{ margin-top:6px; }
+  .bp-inlog{ margin:2px 0 14px 0; }
+  .bp-spoor{ display:flex; flex-direction:column; }
+  .bp-stap{ display:flex; align-items:stretch; gap:12px; }
+  .bp-rail{
+    width:34px; flex-shrink:0; position:relative;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:7px;
+    padding:7px 0 26px 0;   /* 26px: het bolletje komt ongeveer midden naast zijn kaart */
+  }
+  .bp-rail::before{
+    content:''; position:absolute; top:0; bottom:0; left:50%; width:2px; margin-left:-1px;
+    background:rgba(242,234,217,.12);
+  }
+  .bp-stap.vrij .bp-rail::before{ background:rgba(190,159,65,.6); }
+  .bp-stap:first-child .bp-rail::before{ top:7px; }
+  .bp-stap:last-child .bp-rail::before{ bottom:41px; }
+  .bp-punt{
+    width:6px; height:6px; border-radius:50%; position:relative;
+    background:var(--felt-dark); border:1px solid rgba(242,234,217,.25);
+  }
+  .bp-punt.aan{ background:var(--gold); border-color:var(--gold); }
+  .bp-bol{
+    width:30px; height:30px; border-radius:50%; position:relative; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:bold; font-variant-numeric:tabular-nums;
+    background:var(--felt-dark); border:1.5px solid rgba(242,234,217,.25); color:rgba(242,234,217,.6);
+  }
+  .bp-stap.vrij .bp-bol{ background:var(--gold); border-color:var(--gold); color:var(--felt-dark); }
+  .bp-stap.volgende .bp-bol{ border-color:var(--gold); color:var(--gold); box-shadow:0 0 10px rgba(190,159,65,.45); }
+  .bp-beloning{
+    flex:1; min-width:0; display:flex; align-items:center; gap:12px; margin-top:8px;
+    padding:10px 12px; border-radius:10px;
+    background:rgba(0,0,0,.2); border:1px solid var(--line);
+  }
+  .bp-stap.vrij .bp-beloning{ border-color:rgba(190,159,65,.45); }
+  .bp-stap.volgende .bp-beloning{ border-color:var(--gold); background:rgba(190,159,65,.10); }
+  .bp-voorbeeld{ flex-shrink:0; position:relative; min-width:52px; display:flex; justify-content:center; }
+  .bp-stap.dicht .bp-voorbeeld > *, .bp-stap.volgende .bp-voorbeeld > *{ filter:saturate(.35) brightness(.75); }
+  .bp-slot{
+    position:absolute; right:-6px; bottom:-6px; font-size:12px; line-height:1;
+    background:var(--felt-dark); border:1px solid var(--line); border-radius:50%; padding:4px;
+  }
+  .bp-emoji{
+    width:46px; height:46px; border-radius:50%; font-size:26px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(242,234,217,.07); border:1px solid var(--line);
+  }
+  .bp-emoji.beeld{ padding:4px; }
+  .bp-emoji.beeld svg, .bp-emoji.beeld img{ width:100%; height:100%; display:block; object-fit:contain; }
+  .bp-kaarten{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .bp-ballon{
+    max-width:110px; padding:6px 9px; border-radius:12px 12px 12px 3px; font-size:11.5px; line-height:1.25;
+    background:var(--cream); color:var(--felt-dark); font-weight:bold;
+  }
+  .bp-info{ min-width:0; }
+  .bp-soort{ font-size:9px; letter-spacing:1.3px; text-transform:uppercase; opacity:.55; }
+  .bp-naam{ font-weight:bold; color:var(--gold); font-size:14px; margin-top:1px; }
+  .bp-status{ font-size:11px; opacity:.75; margin-top:2px; }
+  .bp-stap.vrij .bp-status{ color:#9fd8a8; opacity:1; }
+  .bp-uitleg-kop{
+    margin:18px 0 8px 0; text-align:center; font-size:11px; letter-spacing:1.2px;
+    text-transform:uppercase; opacity:.6;
+  }
+  .bp-xp-tabel{ width:100%; border-collapse:collapse; font-size:12px; }
+  .bp-xp-tabel th{ font-size:10px; font-weight:normal; opacity:.55; text-align:right; padding:3px 6px; }
+  .bp-xp-tabel th:first-child{ text-align:left; }
+  .bp-xp-tabel td{ padding:4px 6px; text-align:right; border-top:1px solid rgba(47,107,83,.5); font-variant-numeric:tabular-nums; }
+  .bp-xp-tabel td:first-child{ text-align:left; }
+  .bp-xp-tabel td.winst{ color:var(--gold); font-weight:bold; }
+  .bp-noot{ font-size:11px; opacity:.55; text-align:center; margin-top:8px; }
+
+  /* Vergrendelde designs in de lijst en vergrendelde emotes in de kiezer. */
+  .skin-rij.op-slot .skin-proef{ filter:saturate(.35) brightness(.7); }
+  .skin-slot{
+    display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; vertical-align:2px;
+    font-size:10px; font-weight:bold; color:var(--cream); background:rgba(0,0,0,.35); border:1px solid var(--line);
+  }
   .menu-subpanel{
     background:rgba(0,0,0,.25); border:1px solid var(--line); border-radius:10px;
     padding:14px; margin:0 0 8px 0;
@@ -472,8 +621,8 @@
      het instellingenmenu; de ballonnetjes hangen boven het bord (de tegenstander, die zit altijd
      aan de bovenkant) of eronder (jij). */
   .emote-btn{ right:54px; font-size:17px; }
-  .emote-kiezer{ min-width:0; width:252px; padding:10px; }
-  .emote-kiezer .emote-rooster{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .emote-kiezer{ min-width:0; width:262px; padding:10px; }
+  .emote-kiezer .emote-rooster{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
   .emote-kiezer .emote-rooster button{
     margin:0; padding:6px 0; font-size:24px; line-height:1.2; text-align:center;
     background:rgba(0,0,0,.25); border:1px solid var(--line); border-radius:8px;
@@ -485,6 +634,13 @@
   }
   .emote-kiezer button:active{ background:rgba(190,159,65,.35); }
   .emote-kiezer.wacht button{ opacity:.45; }
+  .emote-kiezer .emote-rooster button.beeld{ padding:3px; line-height:0; }
+  .emote-kiezer .emote-rooster button.beeld svg, .emote-kiezer .emote-rooster button.beeld img{ width:100%; height:29px; object-fit:contain; display:block; }
+  /* Nog niet vrijgespeeld in de battlepass: zichtbaar, zodat je weet dat ze bestaan, maar op slot. */
+  .emote-kiezer button.op-slot{ position:relative; opacity:.4; }
+  .emote-kiezer button.op-slot::after{
+    content:'🔒'; position:absolute; top:-5px; right:-5px; font-size:10px; line-height:1;
+  }
   .board-row{ position:relative; }
 
   /* Liggende opstelling (door syncUiScale gekozen als het spel daar groter van in beeld komt):
@@ -528,6 +684,8 @@
     opacity:0; transform:translateX(-50%) scale(.6); transition:opacity .18s, transform .18s;
   }
   .emote-ballon.groot{ font-size:34px; padding:2px 12px; line-height:1.25; }
+  .emote-ballon.beeld{ padding:4px; line-height:0; }
+  .emote-ballon.beeld svg, .emote-ballon.beeld img{ width:64px; height:64px; display:block; object-fit:contain; }
   .emote-ballon.boven{ top:-6px; }
   .emote-ballon.onder{ bottom:-6px; }
   .emote-ballon::after{
@@ -704,9 +862,12 @@
     <div class="menu-suits"><span class="red">♥ ♦</span><span class="black">♠ ♣</span></div>
   </div>
 
+  <div id="accountBalk" class="account-balk"></div>
+
   <div id="menuButtons">
     <button class="menu-btn" onclick="openMenuPanel('multiplayer')">🌐 Multiplayer</button>
     <button class="menu-btn" onclick="openMenuPanel('solo')">Solo spelen</button>
+    <button class="menu-btn bp-knop" onclick="openMenuPanel('battlepass')">🏆 Battlepass <span id="bpKnopTier" class="bp-knop-tier" style="display:none;"></span></button>
     <div class="menu-klein-rij">
       <button class="menu-btn-klein" onclick="openRules()">📖 Spelregels</button>
       <button class="menu-btn-klein" onclick="openMenuPanel('skins')">🎨 Kaartdesigns</button>
@@ -731,6 +892,14 @@
       </span>
     </label>
     <div id="skinLijst"></div>
+  </div>
+
+  <div id="battlepassPanel" class="menu-subpanel" style="display:none;">
+    <div class="subpanel-kop">
+      <button class="subpanel-terug" onclick="openMenuPanel(null)">← Terug</button>
+      <div class="subpanel-title">🏆 Battlepass</div>
+    </div>
+    <div id="bpInhoud"></div>
   </div>
 
   <div id="multiplayerPanel" class="menu-subpanel" style="display:none;">
@@ -1687,6 +1856,57 @@ const RUSTIGE_TAFELS = {
   u10: { naam: 'Antraciet', tableBg: 'repeating-linear-gradient(115deg,rgba(255,255,255,.05) 0 2px,transparent 2px 6px,rgba(255,255,255,.022) 6px 8px,transparent 8px 18px),radial-gradient(ellipse 120% 100% at 50% 0%,#262a33,#15181e 60%,#08090c)' }
 };
 
+/* ======================= BATTLEPASS =======================
+   25 tiers, elke 50 XP een tier (de XP-regels staan in account.js). Vanaf tier 5 om de 2 tiers een
+   beloning: de zes meest uitgesproken kaartdesigns, drie emotes met geluid en twee plaagzinnetjes. Wat in deze lijst
+   staat, is op slot tot je die tier haalt; al de rest blijft voor iedereen vrij. Niet ingelogd = tier 0,
+   dus alles hierin op slot.
+
+   Een beloning verwijst met haar id naar CARD_SKINS (soort 'design') of naar EMOTES ('emote' en
+   'tekst'). De volgorde loopt op in pracht, met de Scherpschutter als pronkstuk op tier 25. */
+const BATTLEPASS = [
+  { tier: 5,  soort:'tekst',  id:'alles' },
+  { tier: 7,  soort:'design', id:'magma' },
+  { tier: 9,  soort:'emote',  id:'clown',  naam:'Clown' },
+  { tier:11,  soort:'design', id:'neon' },
+  { tier:13,  soort:'tekst',  id:'wankel' },
+  { tier:15,  soort:'design', id:'holo' },
+  { tier:17,  soort:'emote',  id:'rip',    naam:'Doodskop' },
+  { tier:19,  soort:'design', id:'barok' },
+  { tier:21,  soort:'design', id:'obsidiaan' },
+  { tier:23,  soort:'design', id:'bladgoud' },
+  { tier:25,  soort:'emote',  id:'sniper', naam:'Scherpschutter' },
+];
+const BP_TIERS = 25;
+const BP_TIER_OPSLAG = 'baarden:tier';
+
+function bpBeloningVoorDesign(id){ return BATTLEPASS.find(b => b.soort === 'design' && b.id === id) || null; }
+function bpBeloningVoorEmote(id){ return BATTLEPASS.find(b => b.soort !== 'design' && b.id === id) || null; }
+
+// Je tier. Het laden van je account duurt even (eerst account.js, dan Firebase, dan je profiel); al
+// die tijd zou je gekozen design terugspringen naar Klassiek. Daarom onthoudt dit toestel de laatst
+// bekende tier, en die geldt tot het echte profiel er is. Bij uitloggen gaat hij weg.
+function huidigeTier(){
+  const a = window.baardenAccount;
+  let bewaard = null;
+  try { bewaard = JSON.parse(localStorage.getItem(BP_TIER_OPSLAG) || 'null'); } catch(e){}
+  if(!a || !a.klaar) return bewaard ? (bewaard.tier || 0) : 0;
+  if(!a.gebruiker){
+    if(bewaard){ try { localStorage.removeItem(BP_TIER_OPSLAG); } catch(e){} }
+    return 0;
+  }
+  if(a.profiel){
+    const tier = a.tierVan(a.profiel.xp).tier;
+    if(!bewaard || bewaard.uid !== a.gebruiker.uid || bewaard.tier !== tier){
+      try { localStorage.setItem(BP_TIER_OPSLAG, JSON.stringify({ uid:a.gebruiker.uid, tier })); } catch(e){}
+    }
+    return tier;
+  }
+  return (bewaard && bewaard.uid === a.gebruiker.uid) ? (bewaard.tier || 0) : 0;
+}
+
+function isVrijgespeeld(beloning){ return !beloning || huidigeTier() >= beloning.tier; }
+
 const RUSTIG_OPSLAG = 'baarden:rustigetafel';
 
 // Zelfde opzet als de designkeuze: het geheugen is de waarheid, opslag onthoudt het alleen. Zie de
@@ -1706,7 +1926,7 @@ function zetRustigeTafel(aan){
   const waarde = aan ? '1' : '0';
   try { sessionStorage.setItem(RUSTIG_OPSLAG, waarde); } catch(e){}
   try { localStorage.setItem(RUSTIG_OPSLAG, waarde); } catch(e){}
-  pasSkinToe(gekozenSkinId());
+  pasSkinToe(effectieveSkinId());
 }
 
 const SKIN_OPSLAG = 'baarden:skin';
@@ -1768,7 +1988,18 @@ function pasSkinToe(id){
   Object.entries(vars).forEach(([k,v]) => root.style.setProperty(k, v));
 }
 
+// Het design dat echt op de kaarten staat. Je keuze blijft bewaard, ook als dat een battlepass-design
+// is dat (nog of even) niet vrij is: bv. tijdens het laden van je profiel, of als je uitlogt. Zodra
+// het weer vrij is, staat het er vanzelf terug.
+function effectieveSkinId(){
+  const id = gekozenSkinId();
+  const beloning = bpBeloningVoorDesign(id);
+  return (beloning && !isVrijgespeeld(beloning)) ? CARD_SKINS[0].id : id;
+}
+
 function kiesSkin(id){
+  const beloning = bpBeloningVoorDesign(id);
+  if(beloning && !isVrijgespeeld(beloning)){ openMenuPanel('battlepass'); return; }
   actieveSkinId = id;                                          // altijd, ook zonder werkende opslag
   try { sessionStorage.setItem(SKIN_OPSLAG, id); } catch(e){}  // geldt voor dit tabblad
   try { localStorage.setItem(SKIN_OPSLAG, id); } catch(e){}    // en als startwaarde voor nieuwe
@@ -2261,7 +2492,7 @@ async function joinRoom(){
 // Het menu toont maar één niveau tegelijk: een subpaneel VERVANGT de hoofdknoppen i.p.v. eronder
 // te verschijnen terwijl de aangeklikte knop bleef staan (dat las verwarrend). `null` = terug naar
 // de hoofdknoppen. Elk subpaneel heeft daarvoor zelf een "← Terug"-knop.
-const MENU_PANELS = { multiplayer:'multiplayerPanel', solo:'soloPanel', ai:'aiPanel', skins:'skinPanel' };
+const MENU_PANELS = { multiplayer:'multiplayerPanel', solo:'soloPanel', ai:'aiPanel', skins:'skinPanel', battlepass:'battlepassPanel' };
 
 function openMenuPanel(name){
   Object.values(MENU_PANELS).forEach(id => {
@@ -2273,6 +2504,7 @@ function openMenuPanel(name){
   if(name !== 'multiplayer') document.getElementById('lobbyMsg').textContent = '';
   if(name === 'skins') renderSkinLijst();
   if(name === 'ai') renderAiKeuze(false);
+  if(name === 'battlepass'){ renderBattlepass(); toonVolgendeBeloning(); }
 }
 
 /** Tekent de keuzelijst. Elke rij toont echte kaartjes in dát design: de variabelen worden op de
@@ -2282,36 +2514,25 @@ function renderSkinLijst(){
   if(!el) return;
   const schakelaar = document.getElementById('rustigeTafel');
   if(schakelaar) schakelaar.checked = rustigeTafelAan();
-  const actief = gekozenSkinId();
+  const actief = effectieveSkinId();
   el.innerHTML = '';
 
   CARD_SKINS.forEach(skin => {
+    const beloning = bpBeloningVoorDesign(skin.id);
+    const opSlot = !!beloning && !isVrijgespeeld(beloning);
     // Bewust een div en geen <button>: een knop mag volgens de HTML-regels geen blok-elementen
     // bevatten, en deze rij bestaat uit divs met de voorbeeldkaartjes. Browsers gaan daar
     // verschillend mee om en op sommige toestellen kwam de tik dan niet aan. Met role en tabindex
     // blijft hij wel bedienbaar met toetsenbord en voorleessoftware.
     const rij = document.createElement('div');
-    rij.className = 'skin-rij' + (skin.id === actief ? ' gekozen' : '');
+    rij.className = 'skin-rij' + (skin.id === actief ? ' gekozen' : '') + (opSlot ? ' op-slot' : '');
     rij.setAttribute('role', 'button');
     rij.setAttribute('tabindex', '0');
     rij.setAttribute('aria-pressed', skin.id === actief ? 'true' : 'false');
     rij.onclick = () => kiesSkin(skin.id);
     rij.onkeydown = (e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); kiesSkin(skin.id); } };
 
-    const proef = document.createElement('div');
-    proef.className = 'skin-proef';
-    Object.entries(skinVars(skin)).forEach(([k,v]) => proef.style.setProperty(k, v));
-
-    // Twee kaarten en een achterkant: genoeg om rood, zwart en de trekstapel te beoordelen.
-    [['A','♥','red'], ['10','♠','black']].forEach(([rank,symbool,kleur])=>{
-      const k = document.createElement('div');
-      k.className = 'skin-kaart ' + kleur;
-      k.innerHTML = '<div>'+rank+'</div><div>'+symbool+'</div>';
-      proef.appendChild(k);
-    });
-    const rug = document.createElement('div');
-    rug.className = 'skin-rug';
-    proef.appendChild(rug);
+    const proef = skinProef(skin);
 
     const tekst = document.createElement('div');
     tekst.className = 'skin-tekst';
@@ -2324,9 +2545,15 @@ function renderSkinLijst(){
       merk.textContent = 'In gebruik';
       naam.appendChild(merk);
     }
+    if(opSlot){
+      const slot = document.createElement('span');
+      slot.className = 'skin-slot';
+      slot.textContent = `🔒 Tier ${beloning.tier}`;
+      naam.appendChild(slot);
+    }
     const uitleg = document.createElement('div');
     uitleg.className = 'skin-uitleg';
-    uitleg.textContent = skin.beschrijving;
+    uitleg.textContent = opSlot ? 'Speel je vrij in de battlepass.' : skin.beschrijving;
     tekst.appendChild(naam);
     tekst.appendChild(uitleg);
 
@@ -2334,6 +2561,24 @@ function renderSkinLijst(){
     rij.appendChild(tekst);
     el.appendChild(rij);
   });
+}
+
+// Twee kaarten en een achterkant in een bepaald design: genoeg om rood, zwart en de trekstapel te
+// beoordelen. De variabelen staan op het blokje zelf, dus het toont dat design los van wat er gekozen is.
+function skinProef(skin){
+  const proef = document.createElement('div');
+  proef.className = 'skin-proef';
+  Object.entries(skinVars(skin)).forEach(([k,v]) => proef.style.setProperty(k, v));
+  [['A','♥','red'], ['10','♠','black']].forEach(([rank,symbool,kleur])=>{
+    const k = document.createElement('div');
+    k.className = 'skin-kaart ' + kleur;
+    k.innerHTML = '<div>'+rank+'</div><div>'+symbool+'</div>';
+    proef.appendChild(k);
+  });
+  const rug = document.createElement('div');
+  rug.className = 'skin-rug';
+  proef.appendChild(rug);
+  return proef;
 }
 
 function generateRoomCode(){
@@ -2600,6 +2845,8 @@ function toggleSettings(){
 // oudere versie van het spel aan de andere kant iets onleesbaars krijgt.
 // Elke emoji heeft een eigen geluidje dat erbij past; de zinnen delen het korte popje. Herkomst en
 // licentie (allemaal CC0) staan in geluid/BRONNEN.txt. De volumes trekken ze ongeveer gelijk.
+// Een emote kan ook een afbeelding zijn in plaats van een emoji: geef hem dan beeld:'<img src="emotes/…">'
+// mee (vierkant, ±256 px). De tekst blijft dan enkel als reserve.
 const EMOTES = [
   { id:'lach',    tekst:'😂', geluid:'geluid/emote-lach.mp3',  volume:1 },
   { id:'huil',    tekst:'😭', geluid:'geluid/emote-huil.mp3',  volume:0.8 },
@@ -2609,6 +2856,11 @@ const EMOTES = [
   { id:'gaap',    tekst:'🥱', geluid:'geluid/emote-gaap.mp3',  volume:1 },
   { id:'stoer',   tekst:'😎', geluid:'geluid/emote-stoer.mp3', volume:0.5 },
   { id:'vuur',    tekst:'🔥', geluid:'geluid/emote-vuur.mp3',  volume:0.35 },
+  // Uit de battlepass (zie BATTLEPASS). De geluiden zijn hier zelf gemaakt, zie geluid/BRONNEN.txt.
+  { id:'clown',   tekst:'🤡', geluid:'geluid/emote-clown.wav', volume:0.45 },
+  { id:'rip',     tekst:'💀', geluid:'geluid/emote-rip.wav',   volume:0.5 },
+  { id:'sniper',  tekst:'🎯', beeld:'<img src="emotes/scherpschutter.png" alt="Scherpschutter" draggable="false">',
+    geluid:'geluid/emote-sniper.wav', volume:0.6 },
   { id:'hallo',   tekst:'Hallo! 👋' },
   { id:'succes',  tekst:'Veel succes!' },
   { id:'goedzet', tekst:'Goed gespeeld!' },
@@ -2617,6 +2869,8 @@ const EMOTES = [
   { id:'oeps',    tekst:'Oeps!' },
   { id:'dreig',   tekst:'Ik kom je toren halen!' },
   { id:'gg',      tekst:'Goede partij!' },
+  { id:'alles',   tekst:'Is dat alles? 😏' },
+  { id:'wankel',  tekst:'Je toren wankelt al…' },
 ];
 const EMOTE_WACHTTIJD = 2500;   // zo snel kan je een volgende sturen: genoeg om niet te spammen
 const EMOTE_DUUR = 3000;        // zo lang blijft een ballonnetje staan
@@ -2640,21 +2894,29 @@ function toggleEmoteKiezer(){
   const el = document.getElementById('emoteKiezer');
   document.getElementById('settingsMenu').style.display = 'none';
   if(el.style.display === 'block'){ el.style.display = 'none'; return; }
-  if(!el.firstChild){
-    const emoji = EMOTES.filter(e => !/[a-z]/i.test(e.tekst));
-    const zinnen = EMOTES.filter(e => /[a-z]/i.test(e.tekst));
-    const rooster = document.createElement('div'); rooster.className = 'emote-rooster';
-    const lijst = document.createElement('div'); lijst.className = 'emote-zinnen';
-    const knop = e => {
-      const b = document.createElement('button');
-      b.textContent = e.tekst;
+  // Elke keer opnieuw opgebouwd: tussen twee keer openen kan er een emote vrijgespeeld zijn.
+  el.innerHTML = '';
+  const emoji = EMOTES.filter(e => e.beeld || !/[a-z]/i.test(e.tekst));
+  const zinnen = EMOTES.filter(e => !e.beeld && /[a-z]/i.test(e.tekst));
+  const rooster = document.createElement('div'); rooster.className = 'emote-rooster';
+  const lijst = document.createElement('div'); lijst.className = 'emote-zinnen';
+  const knop = e => {
+    const b = document.createElement('button');
+    if(e.beeld){ b.innerHTML = e.beeld; b.classList.add('beeld'); }
+    else b.textContent = e.tekst;
+    const beloning = bpBeloningVoorEmote(e.id);
+    if(beloning && !isVrijgespeeld(beloning)){
+      b.disabled = true;
+      b.classList.add('op-slot');
+      b.title = `Speel je vrij op tier ${beloning.tier} van de battlepass`;
+    } else {
       b.onclick = () => stuurEmote(e.id);
-      return b;
-    };
-    emoji.forEach(e => rooster.appendChild(knop(e)));
-    zinnen.forEach(e => lijst.appendChild(knop(e)));
-    el.appendChild(rooster); el.appendChild(lijst);
-  }
+    }
+    return b;
+  };
+  emoji.forEach(e => rooster.appendChild(knop(e)));
+  zinnen.forEach(e => lijst.appendChild(knop(e)));
+  el.appendChild(rooster); el.appendChild(lijst);
   el.style.display = 'block';
   pinTopBar();
 }
@@ -2663,6 +2925,8 @@ async function stuurEmote(id){
   const kiezer = document.getElementById('emoteKiezer');
   kiezer.style.display = 'none';
   if(!emotesBeschikbaar()) return;
+  const beloning = bpBeloningVoorEmote(id);
+  if(beloning && !isVrijgespeeld(beloning)) return;
   const nu = Date.now();
   if(nu - laatsteEmoteVerstuurd < EMOTE_WACHTTIJD) return;
   laatsteEmoteVerstuurd = nu;
@@ -2682,8 +2946,10 @@ function toonEmote(kleur, id){
   const plek = kleur === onderKleur ? 'emoteOnder' : 'emoteBoven';
   const el = document.getElementById(plek);
   if(!el) return;
-  el.textContent = emote.tekst;
-  el.classList.toggle('groot', !/[a-z]/i.test(emote.tekst));
+  if(emote.beeld) el.innerHTML = emote.beeld;
+  else el.textContent = emote.tekst;
+  el.classList.toggle('groot', !emote.beeld && !/[a-z]/i.test(emote.tekst));
+  el.classList.toggle('beeld', !!emote.beeld);
   el.classList.remove('zichtbaar');
   void el.offsetWidth;   // de animatie opnieuw laten starten als er al een ballonnetje stond
   el.classList.add('zichtbaar');
@@ -2708,6 +2974,7 @@ function startEmotes(){
   // De geluiden alvast ophalen, zodat de eerste emote niet stil blijft terwijl het bestand nog laadt.
   // Enkel online: solo en tegen de AI zijn er geen emotes, dus ook niets te downloaden.
   EMOTES.forEach(e => { if(e.geluid) fetch(e.geluid).catch(() => {}); });
+  new Image().src = 'emotes/scherpschutter.png';
   emoteUnsubscribe = window.firebaseDB.onEmote(roomCode, (emote) => {
     if(emote.van === myColor) return;   // die toonden we al bij het versturen
     toonEmote(emote.van, emote.id);
@@ -2807,6 +3074,300 @@ function controleerWinGeluid(){
   else if(myColor) speel(verliesGeluid);   // een toeschouwer verliest niets
 }
 
+/* ======================= ACCOUNT EN XP =======================
+   Het inloggen en het bijhouden zelf zitten in account.js; hier staat enkel wat het spel ervan toont:
+   de balk bovenaan het menu en de "+XP"-regel onder de winnaarsbanner. */
+let vorigeUitslagXp;   // zelfde idee als vorigeWinnaar: undefined = deze partij nog niet gezien
+let partijXp = null;   // { xp, van, naar }, { geenAccount:true }, of null als er niets te melden is
+
+// Kent één keer per partij XP toe, op het moment dat ze eindigt. Wie een al afgelopen partij
+// binnenkomt of herlaadt, ziet het einde nooit "gebeuren" en krijgt dus ook geen tweede keer XP.
+function controleerPartijEinde(){
+  const winnaar = state ? (state.winner || null) : undefined;
+  const nieuw = vorigeUitslagXp === null && !!winnaar;
+  vorigeUitslagXp = winnaar;
+  if(!winnaar){ partijXp = null; return; }
+  if(!nieuw) return;
+  // Solo (beide kleuren zelf) en meekijken tellen niet.
+  const modus = aiMode ? 'ai' : (!soloMode && roomCode && myColor) ? 'online' : null;
+  if(!modus) return;
+  const uitslag = winnaar === 'draw' ? 'gelijk' : winnaar === myColor ? 'winst' : 'verlies';
+  const account = window.baardenAccount;
+  if(!account){ partijXp = null; return; }
+  partijXp = account.gebruiker
+    ? account.partijAfgelopen({ modus, uitslag, aiNiveau })
+    : { geenAccount: true };
+}
+
+function xpMeldingHTML(){
+  if(!partijXp) return '';
+  if(partijXp.geenAccount) return '<div class="xp-melding zacht">Log in via het menu om XP te verdienen.</div>';
+  const { xp, van, naar } = partijXp;
+  let html = `+${xp} XP`;
+  if(van !== null && naar > van){
+    html += ` · Tier ${naar} bereikt! 🎉`;
+    BATTLEPASS.filter(b => b.tier > van && b.tier <= naar).forEach(b => {
+      html += `<span class="nieuw">🎁 Nieuw vrijgespeeld: ${bpNaam(b)}</span>`;
+    });
+  }
+  return `<div class="xp-melding">${html}</div>`;
+}
+
+// De officiële "G" van Google; hun richtlijnen vragen dit logo op een inlogknop.
+const GOOGLE_G = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+
+// Inlogknop met uitleg of foutmelding eronder. Staat zowel bovenaan het menu als in de battlepass.
+function inlogKnop(account, uitleg){
+  const wrap = document.createElement('div');
+  const knop = document.createElement('button');
+  knop.className = 'google-knop';
+  knop.disabled = account.bezig;
+  knop.innerHTML = GOOGLE_G;
+  const tekst = document.createElement('span');
+  tekst.textContent = account.bezig ? 'Bezig met inloggen…' : 'Inloggen met Google';
+  knop.appendChild(tekst);
+  knop.onclick = () => account.inloggen();
+  wrap.appendChild(knop);
+  const onder = document.createElement('div');
+  onder.className = account.fout ? 'account-fout' : 'account-uitleg';
+  onder.textContent = account.fout || uitleg;
+  wrap.appendChild(onder);
+  return wrap;
+}
+
+// Dunne voortgangsbalk naar de volgende tier.
+function xpBalkHTML(t){
+  return `<div class="xp-balk"><div style="width:${Math.round(100 * t.inTier / t.perTier)}%"></div></div>`;
+}
+
+function renderAccount(){
+  const el = document.getElementById('accountBalk');
+  if(!el) return;
+  const account = window.baardenAccount;
+  el.innerHTML = '';
+  if(!account) return;   // account.js niet (of nog niet) geladen: geen balk, spelen kan gewoon
+
+  if(!account.gebruiker){
+    el.appendChild(inlogKnop(account, 'Verdien XP en speel beloningen vrij in de battlepass.'));
+    return;
+  }
+
+  const g = account.gebruiker;
+  const kaart = document.createElement('div');
+  kaart.className = 'account-kaart';
+
+  // De Google-foto, of anders de eerste letter van je naam.
+  const letter = () => {
+    const d = document.createElement('div');
+    d.className = 'account-foto';
+    d.textContent = (g.naam || '?').trim().charAt(0).toUpperCase();
+    return d;
+  };
+  if(g.foto){
+    const img = document.createElement('img');
+    img.className = 'account-foto';
+    img.alt = '';
+    img.referrerPolicy = 'no-referrer';   // Google weigert profielfoto's soms met een verwijzer erbij
+    img.src = g.foto;
+    img.onerror = () => img.replaceWith(letter());
+    kaart.appendChild(img);
+  } else {
+    kaart.appendChild(letter());
+  }
+
+  const midden = document.createElement('div');
+  midden.className = 'account-midden';
+  const boven = document.createElement('div');
+  boven.className = 'account-boven';
+  const naam = document.createElement('div');
+  naam.className = 'account-naam';
+  naam.textContent = g.naam;
+  const uit = document.createElement('button');
+  uit.className = 'account-uit';
+  uit.textContent = 'Uitloggen';
+  uit.onclick = () => account.uitloggen();
+  boven.appendChild(naam);
+  boven.appendChild(uit);
+  midden.appendChild(boven);
+
+  const p = account.profiel;
+  if(p){
+    const t = account.tierVan(p.xp);
+    midden.insertAdjacentHTML('beforeend',
+      `<div class="xp-rij"><span class="xp-tier">Tier ${t.tier}</span>${xpBalkHTML(t)}` +
+      `<span class="xp-getal">${t.max ? 'max' : `${t.inTier}/${t.perTier}`}</span></div>`);
+  } else {
+    const laden = document.createElement('div');
+    laden.className = account.fout ? 'account-fout' : 'xp-tekst';
+    laden.style.textAlign = 'left';
+    laden.textContent = account.fout || 'Voortgang laden…';
+    midden.appendChild(laden);
+  }
+  kaart.appendChild(midden);
+  el.appendChild(kaart);
+}
+
+/* ======================= BATTLEPASS-SCHERM ======================= */
+const BP_SOORTNAAM = { design:'Kaartdesign', emote:'Emote met geluid', tekst:'Tekstje' };
+
+// Naam van een beloning in een zin, bv. in "Nieuw vrijgespeeld: …".
+function bpNaam(b){
+  if(b.soort === 'design') return skinById(b.id).naam;
+  const e = EMOTES.find(x => x.id === b.id);
+  if(!e) return b.id;
+  if(b.soort === 'emote') return b.naam && e.beeld ? `${b.naam}-emote` : `${e.tekst}-emote`;
+  return `“${e.tekst}”`;
+}
+
+function bpVoorbeeld(b){
+  if(b.soort === 'design') return skinProef(skinById(b.id));
+  const e = EMOTES.find(x => x.id === b.id);
+  const d = document.createElement('div');
+  if(b.soort === 'emote'){
+    // Tik op de emoji om het geluid te horen, ook als hij nog op slot is: dan weet je waarvoor je speelt.
+    d.className = 'bp-emoji' + (e.beeld ? ' beeld' : '');
+    if(e.beeld) d.innerHTML = e.beeld; else d.textContent = e.tekst;
+    d.title = 'Tik om te horen';
+    d.onclick = () => speelEmoteGeluid(e);
+  } else {
+    d.className = 'bp-ballon';
+    d.textContent = e.tekst;
+  }
+  return d;
+}
+
+function renderBattlepass(){
+  const el = document.getElementById('bpInhoud');
+  if(!el) return;
+  const account = window.baardenAccount;
+  const tier = huidigeTier();
+  el.innerHTML = '';
+
+  // Kop: je tier en hoever je bent, of een inlogknop.
+  if(account && account.gebruiker && account.profiel){
+    const t = account.tierVan(account.profiel.xp);
+    el.insertAdjacentHTML('beforeend',
+      `<div class="bp-kop">
+        <div class="bp-tiergetal"><div class="label">Tier</div><div class="getal">${t.tier}</div><div class="van">van ${BP_TIERS}</div></div>
+        <div class="bp-voortgang">${xpBalkHTML(t)}
+          <div class="xp-tekst">${t.max ? 'Alles vrijgespeeld. Knap gedaan! 👑' : `${t.inTier} / ${t.perTier} XP naar tier ${t.tier + 1}`}</div>
+        </div>
+      </div>`);
+  } else if(account && account.gebruiker){
+    const laden = document.createElement('div');
+    laden.className = 'bp-kop xp-tekst';
+    laden.textContent = account.fout || 'Voortgang laden…';
+    el.appendChild(laden);
+  } else if(account){
+    const inlog = inlogKnop(account, 'Log in om XP te verdienen en deze beloningen vrij te spelen.');
+    inlog.className = 'bp-inlog';
+    el.appendChild(inlog);
+  } else {
+    el.insertAdjacentHTML('beforeend', '<div class="bp-kop xp-tekst">Inloggen lukt nu niet. Controleer je verbinding en herlaad de pagina.</div>');
+  }
+
+  // Het spoor: elke beloning met de tiers sinds de vorige beloning als puntjes erboven.
+  const xp = account && account.profiel ? account.profiel.xp : null;
+  const spoor = document.createElement('div');
+  spoor.className = 'bp-spoor';
+  // Een tier kan meer dan één beloning hebben: die staan dan onder elkaar naast één bolletje.
+  const tiers = [...new Set(BATTLEPASS.map(b => b.tier))];
+  const volgendeTier = tiers.find(t => tier < t);
+  tiers.forEach(stapTier => {
+    const vrij = tier >= stapTier;
+    const stap = document.createElement('div');
+    stap.className = 'bp-stap ' + (vrij ? 'vrij' : stapTier === volgendeTier ? 'volgende' : 'dicht');
+
+    const rail = document.createElement('div');
+    rail.className = 'bp-rail';
+    const vorigeTier = tiers[tiers.indexOf(stapTier) - 1] || 0;
+    for(let t = vorigeTier + 1; t < stapTier; t++){
+      const punt = document.createElement('div');
+      punt.className = 'bp-punt' + (tier >= t ? ' aan' : '');
+      punt.title = `Tier ${t}`;
+      rail.appendChild(punt);
+    }
+    const bol = document.createElement('div');
+    bol.className = 'bp-bol';
+    bol.textContent = stapTier;
+    rail.appendChild(bol);
+
+    const kaarten = document.createElement('div');
+    kaarten.className = 'bp-kaarten';
+    BATTLEPASS.filter(b => b.tier === stapTier).forEach(b => {
+      const kaart = document.createElement('div');
+      kaart.className = 'bp-beloning';
+      const voorbeeld = document.createElement('div');
+      voorbeeld.className = 'bp-voorbeeld';
+      voorbeeld.appendChild(bpVoorbeeld(b));
+      if(!vrij) voorbeeld.insertAdjacentHTML('beforeend', '<span class="bp-slot">🔒</span>');
+
+      const info = document.createElement('div');
+      info.className = 'bp-info';
+      const soort = document.createElement('div');
+      soort.className = 'bp-soort';
+      soort.textContent = BP_SOORTNAAM[b.soort];
+      const naam = document.createElement('div');
+      naam.className = 'bp-naam';
+      naam.textContent = b.soort === 'design' ? skinById(b.id).naam : (b.naam || 'Plaagzinnetje');
+      const status = document.createElement('div');
+      status.className = 'bp-status';
+      status.textContent = vrij ? '✓ Vrijgespeeld'
+        : xp !== null ? `Nog ${account.tierVan(xp).xpTot(b.tier)} XP`
+        : `Tier ${b.tier}`;
+      info.appendChild(soort); info.appendChild(naam); info.appendChild(status);
+
+      kaart.appendChild(voorbeeld);
+      kaart.appendChild(info);
+      kaarten.appendChild(kaart);
+    });
+    stap.appendChild(rail);
+    stap.appendChild(kaarten);
+    spoor.appendChild(stap);
+  });
+  el.appendChild(spoor);
+
+  // Hoe je XP verdient.
+  if(account && account.XP_REGELS){
+    const r = account.XP_REGELS;
+    const rij = (naam, w, v, g) => `<tr><td>${naam}</td><td class="winst">${w}</td><td>${v}</td><td>${g}</td></tr>`;
+    let rijen = rij('🌐 Online', r.online.winst, r.online.verlies, r.online.gelijk);
+    AI_TEGENSTANDERS.forEach((o, i) => { rijen += rij(`🤖 ${o.naam}`, r.ai.winst[i], r.ai.verlies[i], r.ai.gelijk[i]); });
+    el.insertAdjacentHTML('beforeend',
+      `<div class="bp-uitleg-kop">Zo verdien je XP</div>
+       <table class="bp-xp-tabel"><tr><th></th><th>Winst</th><th>Verlies</th><th>Gelijk</th></tr>${rijen}</table>
+       <div class="bp-noot">Solo spelen levert geen XP op. Elke tier kost ${account.tierVan(0).perTier} XP.</div>`);
+  }
+}
+
+// Scrolt naar de eerstvolgende beloning, zodat je niet bij tier 5 begint als je al op 30 zit.
+function toonVolgendeBeloning(){
+  const doel = document.querySelector('#bpInhoud .bp-stap.volgende');
+  if(doel && huidigeTier() > 6) doel.scrollIntoView({ block:'center' });
+}
+
+// Het tiertje op de battlepass-knop in het menu.
+function renderBpKnop(){
+  const el = document.getElementById('bpKnopTier');
+  if(!el) return;
+  const a = window.baardenAccount;
+  const tonen = !!(a && a.gebruiker && a.profiel);
+  el.style.display = tonen ? '' : 'none';
+  if(tonen) el.textContent = `Tier ${huidigeTier()}`;
+}
+
+// Bij elke wijziging aan je account (in- of uitloggen, profiel geladen, XP erbij): alles wat ervan
+// afhangt opnieuw tekenen, en het design opnieuw toepassen, want dat kan net vrij of op slot gegaan zijn.
+function bijAccountWijziging(){
+  renderAccount();
+  renderBpKnop();
+  pasSkinToe(effectieveSkinId());
+  const zichtbaar = id => { const p = document.getElementById(id); return p && p.style.display !== 'none'; };
+  if(zichtbaar('battlepassPanel')) renderBattlepass();
+  if(zichtbaar('skinPanel')) renderSkinLijst();
+}
+window.addEventListener('baarden-account', bijAccountWijziging);
+
 // Een opwaardering legt de kaarten één voor één op de toren, en tussendoor wordt er hertekend (en
 // online soms ook opgeslagen). Daarom tellen we pas als de opwaardering helemaal klaar is: zolang
 // state.towerBuild loopt voor die kleur, blijft het oude aantal staan.
@@ -2895,6 +3456,8 @@ function backToMenu(){
   }
   stopEmotes();
   vorigeWinnaar = undefined;
+  vorigeUitslagXp = undefined;
+  partijXp = null;
   setTimeout(syncUiScale, 0);   // na het verbergen van het spelscherm: terug naar de staande schaal
   vorigeTorenLagen = {};
   // Clean up old polling timer if it exists
@@ -5110,10 +5673,11 @@ function renderAll(){
   // en gooit nooit, dus dit kan een partij niet verstoren.
   if((aiMode || soloMode) && window.BaardenOpname && BaardenOpname.bezig()) BaardenOpname.leg(state);
 
+  controleerPartijEinde();
   document.getElementById('winnerBanner').innerHTML = !state.winner ? ''
     : state.winner==='draw'
-      ? `<div class="winner-banner">🤝 Gelijkspel — dezelfde stelling kwam 3 keer voor.</div>${exportKnopHTML()}`
-      : `<div class="winner-banner">🏆 ${label(state.winner)} heeft de toren veroverd!</div>${exportKnopHTML()}`;
+      ? `<div class="winner-banner">🤝 Gelijkspel — dezelfde stelling kwam 3 keer voor.</div>${xpMeldingHTML()}${exportKnopHTML()}`
+      : `<div class="winner-banner">🏆 ${label(state.winner)} heeft de toren veroverd!</div>${xpMeldingHTML()}${exportKnopHTML()}`;
   controleerTorenCombo();
   controleerWinGeluid();
   document.getElementById('emoteBtn').style.display = emotesBeschikbaar() ? 'flex' : 'none';
@@ -5690,7 +6254,7 @@ controleerUpdate();
 setInterval(() => { if(!document.hidden) controleerUpdate(); }, 5 * 60 * 1000);
 document.addEventListener('visibilitychange', () => { if(!document.hidden) controleerUpdate(); });
 
-pasSkinToe(gekozenSkinId());
+pasSkinToe(effectieveSkinId());
 autoRejoin();
 
 </script>

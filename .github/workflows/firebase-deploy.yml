@@ -60,8 +60,8 @@ jobs:
           printf '%s' "$SA" > "$RUNNER_TEMP/firebase-key.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-key.json" >> "$GITHUB_ENV"
 
-      # Hosting publiceert de map public/. De database rules staan niet in deze
-      # repo (ze worden in de console beheerd), dus enkel hosting gaat mee.
+      # Hosting publiceert de map public/. Database rules en inlogmethodes gaan
+      # bewust niet mee: die rol je zelf uit (zie FIREBASE.md).
       - name: Deploy
         if: steps.check.outputs.aanwezig == 'true'
         run: |

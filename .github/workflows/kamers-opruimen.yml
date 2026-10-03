@@ -45,7 +45,7 @@ jobs:
           node-version: '20'
 
       # Het script praat via de gewone REST-API met de database, zonder sleutel. Dat kan omdat de
-      # database-regels open staan. Worden die ooit dichtgezet, dan faalt deze stap zichtbaar en
+      # regels voor /rooms open staan. Worden die ooit dichtgezet, dan faalt deze stap zichtbaar en
       # moet het script een service-account-token gaan meesturen.
       - name: Opruimen
         run: |
