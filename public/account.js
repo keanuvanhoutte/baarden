@@ -37,30 +37,46 @@ const app = initializeApp({
 const auth = getAuth(app);
 auth.languageCode = 'nl';
 
-/* ======================= XP EN NIVEAUS =======================
-   Eén plek voor alle getallen, zodat de battlepass er later op kan bouwen. Alleen partijen tegen een
-   echte tegenstander tellen: online, of tegen de AI. Een solopartij (beide kleuren zelf) levert niets
-   op, anders klik je in twee minuten tien niveaus bij elkaar. */
-const XP_PER_NIVEAU = 100;
+/* ======================= XP EN TIERS =======================
+   Eén plek voor alle getallen van de battlepass. Alleen partijen tegen een echte tegenstander tellen:
+   online, of tegen de AI. Een solopartij (beide kleuren zelf) levert niets op, anders klik je in twee
+   minuten tien tiers bij elkaar.
+
+   Tegen de AI loopt de beloning sterk op met de moeilijkheid: Bob verslaan is zo gebeurd, Stefaan
+   niet. Online levert net iets meer op dan Stefaan, want daar zit een echt mens tegenover. Verliezen
+   levert ook wat op, zodat wie tegen sterkere tegenstanders oefent niet met lege handen blijft.
+   Met 100 XP per tier is tier 50 na ruwweg 110 gewonnen online partijen bereikt. */
+const XP_PER_TIER = 100;
+const MAX_TIER = 50;
 const XP_REGELS = {
-  online: { winst: 40, verlies: 15, gelijk: 20 },
-  // Tegen de AI hangt winst af van de moeilijkheid (1 = Bob ... 5 = Stefaan): 15 tot 35 XP.
-  ai:     { winst: (niveau) => 10 + 5 * niveau, verlies: 5, gelijk: 10 },
+  online: { winst: 45, verlies: 15, gelijk: 22 },
+  // Per AI-niveau, van 1 = Bob tot 5 = Stefaan.
+  ai: {
+    winst:   [5, 12, 20, 30, 40],
+    verlies: [1,  3,  5,  8, 10],
+    gelijk:  [2,  6, 10, 15, 20],
+  },
 };
 
 function xpVoor(modus, uitslag, aiNiveau){
   const regel = XP_REGELS[modus];
   if(!regel || !(uitslag in regel)) return 0;
   const xp = regel[uitslag];
-  return typeof xp === 'function' ? xp(Math.max(1, Math.min(5, aiNiveau || 1))) : xp;
+  return Array.isArray(xp) ? xp[Math.max(1, Math.min(xp.length, aiNiveau || 1)) - 1] : xp;
 }
 
-function niveauVan(xp){
+// Tier 1 heb je meteen; elke 100 XP komt er een bij, tot en met tier 50. Daarna blijft de XP gewoon
+// tellen, maar de balk staat vol.
+function tierVan(xp){
   const totaal = Math.max(0, xp || 0);
+  const tier = Math.min(MAX_TIER, Math.floor(totaal / XP_PER_TIER) + 1);
+  const max = tier === MAX_TIER;
   return {
-    niveau: Math.floor(totaal / XP_PER_NIVEAU) + 1,
-    inNiveau: totaal % XP_PER_NIVEAU,
-    perNiveau: XP_PER_NIVEAU,
+    tier,
+    max,
+    inTier: max ? XP_PER_TIER : totaal % XP_PER_TIER,
+    perTier: XP_PER_TIER,
+    xpTot: (t) => Math.max(0, (t - 1) * XP_PER_TIER - totaal),   // hoeveel XP nog tot tier t
   };
 }
 
@@ -82,6 +98,7 @@ let gebruiker = null;   // { uid, naam, foto } of null
 let profiel = null;     // { xp, partijen } of null zolang het nog laadt
 let bezig = false;      // inlogvenster open
 let fout = null;        // laatste foutmelding voor de speler, of null
+let klaar = false;      // weet Firebase al of er iemand ingelogd is? (bij het laden duurt dat even)
 
 function meld(){
   window.dispatchEvent(new CustomEvent('baarden-account'));
@@ -107,6 +124,7 @@ async function laadProfiel(uid){
 }
 
 onAuthStateChanged(auth, (u) => {
+  klaar = true;
   gebruiker = u ? { uid: u.uid, naam: u.displayName || u.email || 'Speler', foto: u.photoURL || null } : null;
   profiel = null;
   meld();
@@ -127,8 +145,11 @@ window.baardenAccount = {
   get profiel(){ return profiel; },
   get bezig(){ return bezig; },
   get fout(){ return fout; },
-  niveauVan,
+  get klaar(){ return klaar; },
+  tierVan,
   xpVoor,
+  XP_REGELS,
+  MAX_TIER,
 
   async inloggen(){
     if(bezig) return;
@@ -162,7 +183,8 @@ window.baardenAccount = {
   },
 
   /**
-   * Een partij is net afgelopen. Geeft meteen { xp, niveauOmhoog } terug (null als ze niet telt of je
+   * Een partij is net afgelopen. Geeft meteen { xp, van, naar } terug, met de tier ervoor en erna
+   * (van/naar null als het profiel nog niet geladen was), of null als ze niet telt of je
    * niet ingelogd bent) en schrijft dat op de achtergrond weg.
    *
    * Het wegschrijven telt op met increment van de server, en niet als "lees, tel op, schrijf terug".
@@ -176,7 +198,7 @@ window.baardenAccount = {
     if(!xp) return null;
     const teller = { winst: 'gewonnen', verlies: 'verloren', gelijk: 'gelijk' }[uitslag];
     const uid = gebruiker.uid;
-    const voorheen = profiel ? niveauVan(profiel.xp).niveau : null;
+    const van = profiel ? tierVan(profiel.xp).tier : null;
 
     // Meteen lokaal bijwerken, zodat het menu klopt zonder op de server te wachten.
     if(profiel){
@@ -200,8 +222,8 @@ window.baardenAccount = {
       if(gebruiker && gebruiker.uid === uid) laadProfiel(uid);
     });
 
-    const nu = profiel ? niveauVan(profiel.xp).niveau : null;
-    return { xp, niveauOmhoog: voorheen !== null && nu > voorheen ? nu : null };
+    const naar = profiel ? tierVan(profiel.xp).tier : null;
+    return { xp, van, naar };
   },
 };
 meld();
