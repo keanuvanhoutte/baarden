@@ -1164,6 +1164,7 @@
 <script src="js/baarden_acties.js"></script>
 <script src="js/baarden_bot.js"></script>
 <script src="js/baarden_zoek.js"></script>
+<script src="js/eenbot_motor.js"></script>
 
 <script>
 /* ======================= SPELREGELS PDF (base64-ingebed, volledig zelfstandig bestand) ======================= */
@@ -2844,6 +2845,7 @@ function renderAiKeuze(gewisseld){
   // mee speelt; wie Robert of Stefaan kiest, hoort niets te downloaden. Deze functie draait bij elke
   // verschuiving van de slider, dus zodra iemand naar zo'n trap gaat begint het laden alsnog op tijd.
   if(AI_TEGENSTANDERS.some(o=>o.rlBot)) rlLaad();
+  if(EENBOT_AAN) eenbotLaad();
   const paneel = document.getElementById('aiPanel');
   const t = AI_TEGENSTANDERS[aiKeuze.niveau-1];
   zetNiveauKleuren(paneel, t);
@@ -2914,6 +2916,7 @@ function startVsAI(){
   if(!aiKeuze) aiKeuze = laadAiKeuze();
   // Zelfde afweging als in renderAiKeuze: geen netwerk downloaden voor een partij die het niet gebruikt.
   if(AI_TEGENSTANDERS.some(o=>o.rlBot)) rlLaad();
+  if(EENBOT_AAN) eenbotLaad();
   const humanColor = aiKeuze.kleur;
   aiNiveau = aiKeuze.niveau;
   aiMode = true;
@@ -5208,13 +5211,25 @@ let waarderingNet = null, waarderingKapot = false;
 // js/meet_tegen_oude_ai.js).
 function waarderingAan(maxColor){ return WAARDERING_AAN && waarderingNet !== null; }
 
+// Geeft true zodra het netwerk er is. Een tweede aanroep (een meetopstelling, terwijl het spel het
+// al ophaalt) wacht op dezelfde lading in plaats van een tweede te starten of false te melden.
+let waarderingBelofte = null;
 function waarderingLaad(){
-  if(waarderingNet || !window.BaardenWaardering || !window.BaardenToestand) return Promise.resolve(false);
-  return fetch(WAARDERING_PAD)
-    .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(blob => { waarderingNet = BaardenWaardering.laad(blob); return true; })
-    .catch(err => { console.warn('Baarden: het waarderingsnetwerk laadde niet; de oude waardering blijft.', err); return false; });
+  if(waarderingNet) return Promise.resolve(true);
+  if(!window.BaardenWaardering || !window.BaardenToestand) return Promise.resolve(false);
+  if(!waarderingBelofte){
+    waarderingBelofte = fetch(WAARDERING_PAD)
+      .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(blob => { waarderingNet = BaardenWaardering.laad(blob); return true; })
+      .catch(err => { console.warn('Baarden: het waarderingsnetwerk laadde niet; de oude waardering blijft.', err); return false; });
+  }
+  return waarderingBelofte;
 }
+// Het netwerk zelf ophalen. Tot 3 oktober 2026 gebeurde dat alleen in rlLaad(), en dat draait alleen
+// als een trap `rlBot: true` heeft -- wat sinds 22 september nergens zo is. Het netwerk stond dus
+// aan (WAARDERING_AAN) maar werd nooit geladen, en elke trap speelde met de handgeschreven waardering.
+// Gevonden bij de herbouw (RL/resultaten/HERBOUW-LOG.md, "VONDST"). 162 KB, dus gewoon altijd laden.
+if(WAARDERING_AAN) waarderingLaad();
 
 const RL_NET_VERSIE = '20260916';
 const RL_NET_PAD = 'js/baarden_net.json?v=' + RL_NET_VERSIE;
@@ -5250,6 +5265,61 @@ function rlLaad(){
 }
 
 function rlKlaar(){ return rlStatus === 'klaar' && window.BaardenBot && BaardenBot.klaar(); }
+
+// -- EenBot: één zoeker voor elke beslissing -------------------------------------------------------
+// Leggen, schuiven, hold, blok-kaart, toren opbouwen, herleven: alles gaat door dezelfde alfa-bèta
+// zoeker (js/eenbot_motor.js, een getrouwe overzetting van RL/eenbot.py) met het waarderingsnetwerk
+// aan de bladeren. Geen handgeschreven formules meer voor de legfase of de blok-kaart.
+//
+// Het netwerk is na de herbouw verder getraind met zelfspel (RL/lus.py, reeks B, generatie 6:
+// 60% tegen zichzelf, 20% tegen een oudere generatie, 20% tegen deze Stefaan).
+//
+// GEMETEN IN DIT SPEL (js/meet_eenbot.js, diepte 4, 1 wereld, verse delingen):
+//     EenBot tegen Stefaan met het waarderingsnetwerk   76,5% +-2,8   (300 partijen)
+//     EenBot tegen Stefaan zonder netwerk               74,3% +-3,5   (200 partijen)
+//     controle Stefaan tegen Stefaan                     50,0%
+//     bedenktijd: mediaan 15,5 ms op een pc (alleen), p99 ~115 ms, max ~200 ms
+// Python zei 79,3% +-2,2 (500 partijen). Zie RL/resultaten/HERBOUW-LOG.md.
+//
+// Aan sinds 3 oktober 2026. `var` en niet `let`: renderAiKeuze() kan lopen voor deze regel bereikt
+// is, en dan mag dit niet struikelen. Op false zetten = trap 5 speelt weer als de oude Stefaan.
+var EENBOT_AAN = true;
+const EENBOT_OPTIES = { diepte: 4, werelden: 1, wortelmarge: 0.1, legpas: true, ordendiepte: 3 };
+var eenbotZoeker = null, eenbotStatus = 'ongeladen';
+// Zelfde ?v=-afspraak als WAARDERING_PAD: train ik opnieuw, dan verandert dit getal mee.
+const EENBOT_NET_PAD = 'js/eenbot_net.json?v=20261003';
+
+function eenbotLaad(){
+  if(eenbotStatus !== 'ongeladen' || !window.EenBot) return;
+  eenbotStatus = 'laden';
+  fetch(EENBOT_NET_PAD)
+    .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(blob => { eenbotZoeker = new EenBot.Zoeker(new EenBot.Netwerk(blob), EENBOT_OPTIES); eenbotStatus = 'klaar'; })
+    .catch(err => { eenbotStatus = 'mislukt'; console.warn('Baarden: EenBot laadde niet; de oude AI speelt.', err); });
+}
+// Meteen bij het openen van de pagina, niet pas als iemand een trap kiest: de eerste beurt van de
+// bot kan anders net voor het netwerk binnen is vallen, en dan speelt hij die met de oude AI.
+if(EENBOT_AAN) eenbotLaad();
+
+// Alleen trap 5. Een meetopstelling vervangt deze functie om EenBot per kleur aan te zetten.
+function eenbotSpeelt(){ return EENBOT_AAN && eenbotStatus === 'klaar' && aiTegenstander().niveau === 5; }
+
+// Eén beurt. Een opbouwkeuze of een herleving is gewoon de volgende beslissing van dezelfde beurt.
+async function eenbotBeurt(){
+  for(let stap = 0; stap < 24; stap++){
+    if(!state || state.winner || state.turn !== aiColor) return true;
+    if(state.phase === 'draw' || state.phase === 'gameover') return true;
+    const g = EenBot.vanBrowser(state, 120);
+    const legaal = g.legalActions();
+    if(!legaal.length) return false;
+    const actie = eenbotZoeker.kies(g, legaal);
+    if(!await rlVoerUit(BaardenActies.decodeer(actie, aiColor), aiColor)) return false;
+    if(!state || state.winner || state.turn !== aiColor) return true;
+    if(!state.towerBuild && !state.reviveChoice) return true;
+    await sleep(350);
+  }
+  return true;
+}
 
 // De noodrem. Voert de bot drie keer na elkaar iets uit dat de stelling niet verandert, dan zit hij vast
 // en speelt de oude AI de partij uit. Dat mag nooit nodig zijn -- maar als het toch gebeurt, blijft de
@@ -5690,6 +5760,14 @@ async function aiTakeTurn(){
     // netwerk. Staat dat nergens aan, dan is dit gewoon de oude zoeker -- de bot die het spel altijd
     // gespeeld heeft. Lukt het netwerk niet, dan neemt de zoeker de partij over op precies het niveau
     // dat de speler koos, dus een storing is voor de speler onzichtbaar.
+    // EenBot, als hij aanstaat. Mislukt er iets, dan maakt de oude AI de beurt af: voor de speler
+    // onzichtbaar, en de partij loopt nooit vast op de nieuwe bot.
+    else if(eenbotSpeelt()){
+      let gelukt = false;
+      try{ gelukt = await eenbotBeurt(); }
+      catch(err){ console.warn('Baarden: EenBot viel uit; de oude AI neemt de beurt over.', err); }
+      if(!gelukt && state && !state.winner && state.turn === aiColor) await aiOudeBeurt();
+    }
     else if(aiTegenstander().rlBot && rlKlaar()){ if(!await rlBeurt()) await aiOudeBeurt(); }
     else { await aiOudeBeurt(); }
   } finally {
