@@ -34,4 +34,4 @@ torencombo.mp3
 Geluiden bij de battlepass-emotes (zelf gemaakt met een klein Python-script, dus geen licentie van derden):
   emote-clown.wav  🤡  twee keer "toet" van een clownstoeter: twee licht valse zaagtanden door een filter, 0,50 s
   emote-rip.wav    💀  droevige trombone, "wah wah wah waaah": vier dalende noten met een filter dat open en dicht gaat, 1,89 s
-  emote-sniper.wav  (klaar voor de Scherpschutter-emote, nog niet in gebruik)  telescoopklik, schot en een cartoonachtige afketser "pjiuuw", 0,86 s
+  emote-sniper.wav  🎯  Scherpschutter (tier 25): telescoopklik, schot en een cartoonachtige afketser "pjiuuw", 0,86 s

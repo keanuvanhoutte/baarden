@@ -219,8 +219,8 @@
     display:flex; align-items:center; justify-content:center;
     background:rgba(242,234,217,.07); border:1px solid var(--line);
   }
-  .bp-emoji.beeld{ width:56px; height:56px; border-radius:12px; overflow:hidden; padding:0; border:1px solid var(--gold); }
-  .bp-emoji.beeld svg, .bp-emoji.beeld img{ width:100%; height:100%; display:block; object-fit:cover; }
+  .bp-emoji.beeld{ padding:4px; }
+  .bp-emoji.beeld svg, .bp-emoji.beeld img{ width:100%; height:100%; display:block; object-fit:contain; }
   .bp-kaarten{ flex:1; min-width:0; display:flex; flex-direction:column; }
   .bp-ballon{
     max-width:110px; padding:6px 9px; border-radius:12px 12px 12px 3px; font-size:11.5px; line-height:1.25;
@@ -635,7 +635,7 @@
   .emote-kiezer button:active{ background:rgba(190,159,65,.35); }
   .emote-kiezer.wacht button{ opacity:.45; }
   .emote-kiezer .emote-rooster button.beeld{ padding:3px; line-height:0; }
-  .emote-kiezer .emote-rooster button.beeld svg, .emote-kiezer .emote-rooster button.beeld img{ width:100%; height:34px; object-fit:cover; border-radius:6px; display:block; }
+  .emote-kiezer .emote-rooster button.beeld svg, .emote-kiezer .emote-rooster button.beeld img{ width:100%; height:29px; object-fit:contain; display:block; }
   /* Nog niet vrijgespeeld in de battlepass: zichtbaar, zodat je weet dat ze bestaan, maar op slot. */
   .emote-kiezer button.op-slot{ position:relative; opacity:.4; }
   .emote-kiezer button.op-slot::after{
@@ -685,7 +685,7 @@
   }
   .emote-ballon.groot{ font-size:34px; padding:2px 12px; line-height:1.25; }
   .emote-ballon.beeld{ padding:4px; line-height:0; }
-  .emote-ballon.beeld svg, .emote-ballon.beeld img{ width:84px; height:84px; display:block; border-radius:12px; object-fit:cover; }
+  .emote-ballon.beeld svg, .emote-ballon.beeld img{ width:64px; height:64px; display:block; object-fit:contain; }
   .emote-ballon.boven{ top:-6px; }
   .emote-ballon.onder{ bottom:-6px; }
   .emote-ballon::after{
@@ -1856,26 +1856,27 @@ const RUSTIGE_TAFELS = {
 };
 
 /* ======================= BATTLEPASS =======================
-   50 tiers, elke 100 XP een tier (de XP-regels staan in account.js). Om de 5 tiers een beloning: de
-   zes meest uitgesproken kaartdesigns, twee emoji met geluid en twee plaagzinnetjes. Wat in deze lijst
+   25 tiers, elke 50 XP een tier (de XP-regels staan in account.js). Vanaf tier 5 om de 2 tiers een
+   beloning: de zes meest uitgesproken kaartdesigns, drie emotes met geluid en twee plaagzinnetjes. Wat in deze lijst
    staat, is op slot tot je die tier haalt; al de rest blijft voor iedereen vrij. Niet ingelogd = tier 0,
    dus alles hierin op slot.
 
    Een beloning verwijst met haar id naar CARD_SKINS (soort 'design') of naar EMOTES ('emote' en
-   'tekst'). De volgorde loopt op in pracht: Bladgoud is het pronkstuk op tier 50. */
+   'tekst'). De volgorde loopt op in pracht, met de Scherpschutter als pronkstuk op tier 25. */
 const BATTLEPASS = [
   { tier: 5,  soort:'tekst',  id:'alles' },
-  { tier:10,  soort:'design', id:'magma' },
-  { tier:15,  soort:'emote',  id:'clown', naam:'Clown' },
-  { tier:20,  soort:'design', id:'neon' },
-  { tier:25,  soort:'tekst',  id:'wankel' },
-  { tier:30,  soort:'design', id:'holo' },
-  { tier:35,  soort:'emote',  id:'rip',   naam:'Doodskop' },
-  { tier:40,  soort:'design', id:'barok' },
-  { tier:45,  soort:'design', id:'obsidiaan' },
-  { tier:50,  soort:'design', id:'bladgoud' },
+  { tier: 7,  soort:'design', id:'magma' },
+  { tier: 9,  soort:'emote',  id:'clown',  naam:'Clown' },
+  { tier:11,  soort:'design', id:'neon' },
+  { tier:13,  soort:'tekst',  id:'wankel' },
+  { tier:15,  soort:'design', id:'holo' },
+  { tier:17,  soort:'emote',  id:'rip',    naam:'Doodskop' },
+  { tier:19,  soort:'design', id:'barok' },
+  { tier:21,  soort:'design', id:'obsidiaan' },
+  { tier:23,  soort:'design', id:'bladgoud' },
+  { tier:25,  soort:'emote',  id:'sniper', naam:'Scherpschutter' },
 ];
-const BP_TIERS = 50;
+const BP_TIERS = 25;
 const BP_TIER_OPSLAG = 'baarden:tier';
 
 function bpBeloningVoorDesign(id){ return BATTLEPASS.find(b => b.soort === 'design' && b.id === id) || null; }
@@ -2855,6 +2856,8 @@ const EMOTES = [
   // Uit de battlepass (zie BATTLEPASS). De geluiden zijn hier zelf gemaakt, zie geluid/BRONNEN.txt.
   { id:'clown',   tekst:'🤡', geluid:'geluid/emote-clown.wav', volume:0.45 },
   { id:'rip',     tekst:'💀', geluid:'geluid/emote-rip.wav',   volume:0.5 },
+  { id:'sniper',  tekst:'🎯', beeld:'<img src="emotes/scherpschutter.png" alt="Scherpschutter" draggable="false">',
+    geluid:'geluid/emote-sniper.wav', volume:0.6 },
   { id:'hallo',   tekst:'Hallo! 👋' },
   { id:'succes',  tekst:'Veel succes!' },
   { id:'goedzet', tekst:'Goed gespeeld!' },
@@ -2968,6 +2971,7 @@ function startEmotes(){
   // De geluiden alvast ophalen, zodat de eerste emote niet stil blijft terwijl het bestand nog laadt.
   // Enkel online: solo en tegen de AI zijn er geen emotes, dus ook niets te downloaden.
   EMOTES.forEach(e => { if(e.geluid) fetch(e.geluid).catch(() => {}); });
+  new Image().src = 'emotes/scherpschutter.png';
   emoteUnsubscribe = window.firebaseDB.onEmote(roomCode, (emote) => {
     if(emote.van === myColor) return;   // die toonden we al bij het versturen
     toonEmote(emote.van, emote.id);
@@ -3259,11 +3263,11 @@ function renderBattlepass(){
     el.insertAdjacentHTML('beforeend', '<div class="bp-kop xp-tekst">Inloggen lukt nu niet. Controleer je verbinding en herlaad de pagina.</div>');
   }
 
-  // Het spoor: om de 5 tiers een beloning, met de 4 tussenliggende tiers als puntjes erboven.
+  // Het spoor: elke beloning met de tiers sinds de vorige beloning als puntjes erboven.
   const xp = account && account.profiel ? account.profiel.xp : null;
   const spoor = document.createElement('div');
   spoor.className = 'bp-spoor';
-  // Een tier kan meer dan één beloning hebben (tier 50): die staan dan onder elkaar naast één bolletje.
+  // Een tier kan meer dan één beloning hebben: die staan dan onder elkaar naast één bolletje.
   const tiers = [...new Set(BATTLEPASS.map(b => b.tier))];
   const volgendeTier = tiers.find(t => tier < t);
   tiers.forEach(stapTier => {
@@ -3273,7 +3277,8 @@ function renderBattlepass(){
 
     const rail = document.createElement('div');
     rail.className = 'bp-rail';
-    for(let t = stapTier - 4; t < stapTier; t++){
+    const vorigeTier = tiers[tiers.indexOf(stapTier) - 1] || 0;
+    for(let t = vorigeTier + 1; t < stapTier; t++){
       const punt = document.createElement('div');
       punt.className = 'bp-punt' + (tier >= t ? ' aan' : '');
       punt.title = `Tier ${t}`;
@@ -3328,14 +3333,14 @@ function renderBattlepass(){
     el.insertAdjacentHTML('beforeend',
       `<div class="bp-uitleg-kop">Zo verdien je XP</div>
        <table class="bp-xp-tabel"><tr><th></th><th>Winst</th><th>Verlies</th><th>Gelijk</th></tr>${rijen}</table>
-       <div class="bp-noot">Solo spelen levert geen XP op. Elke tier kost 100 XP.</div>`);
+       <div class="bp-noot">Solo spelen levert geen XP op. Elke tier kost ${account.tierVan(0).perTier} XP.</div>`);
   }
 }
 
 // Scrolt naar de eerstvolgende beloning, zodat je niet bij tier 5 begint als je al op 30 zit.
 function toonVolgendeBeloning(){
   const doel = document.querySelector('#bpInhoud .bp-stap.volgende');
-  if(doel && huidigeTier() > 10) doel.scrollIntoView({ block:'center' });
+  if(doel && huidigeTier() > 6) doel.scrollIntoView({ block:'center' });
 }
 
 // Het tiertje op de battlepass-knop in het menu.
