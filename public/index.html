@@ -17,6 +17,11 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b3d2e">
 <meta name="apple-mobile-web-app-title" content="Baarden">
+<!-- Letters voor het menu en de spelregels: Playfair Display voor titels, Lato voor de rest. Laden
+     ze niet (offline), dan valt alles terug op Georgia en de systeemletter. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <!-- Firebase SDK -->
 <script src="firebaseConfig.js"></script>
 <!-- Inloggen met Google en XP (zie account.js). Een module laadt pas na de rest; lukt dat niet, dan
@@ -77,32 +82,112 @@
   }
   .subtitle{ text-align:center; font-size:12px; opacity:.7; margin-bottom:16px;}
 
-  .menu-title{ text-align:center; margin: 18px 0 26px 0; }
-  .menu-title .menu-name{
-    font-family:'Trebuchet MS', Helvetica, sans-serif; font-size:34px; font-weight:bold;
-    letter-spacing:6px; text-transform:uppercase; color:var(--gold);
-    text-shadow: 0 2px 4px rgba(0,0,0,.4);
+  /* Het menu (ontwerp 4a, subschermen 6a-6f). Bovenaan een waaier van vier kaarten met de naam eronder.
+     In een subscherm (#lobby.sub) wordt die kop kleiner, zodat het paneel eronder ruimte heeft.
+     Het menu heeft geen eigen kader meer: de knoppen liggen rechtstreeks op het laken. */
+  #lobbyWrap, .rules-overlay{ font-family:Lato, system-ui, sans-serif; }
+  #lobbyWrap button, .rules-overlay button, .rules-overlay a{ font-family:inherit; }
+  #lobby{ background:none; border:none; max-width:390px; padding:0 14px 10px; }
+  .menu-kop{ position:relative; text-align:center; }
+  .menu-waaier{ position:relative; height:184px; margin-top:4px; }
+  .waaier-kaart{
+    position:absolute; left:50%; top:20px; width:96px; height:136px; margin-left:-48px;
+    border-radius:8px; background:var(--cream); color:var(--black);
+    box-shadow:0 10px 24px rgba(0,0,0,.5); font-family:'Playfair Display', Georgia, serif;
+    transform:translateX(var(--x)) rotate(var(--r)) translateY(var(--y));
+    transition:transform .25s ease, width .25s ease, height .25s ease, margin .25s ease;
   }
-  .menu-title .menu-suits{ margin-top:8px; font-size:20px; letter-spacing:10px; }
-  .menu-title .menu-suits .red{ color:var(--red); }
-  .menu-title .menu-suits .black{ color:var(--cream); }
+  .waaier-kaart.rood{ color:var(--red); }
+  .waaier-kaart.rug{
+    background:repeating-linear-gradient(135deg, #082a20, #082a20 3px, #10493a 3px, #10493a 6px);
+    border:4px solid var(--cream);
+  }
+  .waaier-kaart .hoek{
+    position:absolute; left:8px; top:6px; font-weight:900; font-size:18px; line-height:1; text-align:center;
+  }
+  .waaier-kaart .hoek span{ font-size:14px; }
+  .waaier-kaart .midden{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:48px;
+  }
+  .menu-name{
+    position:relative; z-index:2; margin-top:4px;
+    font-family:'Playfair Display', Georgia, serif; font-weight:900; font-size:52px; line-height:1;
+    color:#e3c76a; text-shadow:0 3px 0 #6e5a1e, 0 8px 18px rgba(0,0,0,.5);
+    transition:font-size .25s ease;
+  }
+  #lobby.sub .menu-waaier{ height:146px; margin-top:4px; }
+  #lobby.sub .waaier-kaart{
+    top:14px; width:78px; height:110px; margin-left:-39px;
+    transform:translateX(calc(var(--x) * .83)) rotate(calc(var(--r) * 1.15)) translateY(var(--y));
+  }
+  #lobby.sub .waaier-kaart .hoek{ left:7px; top:5px; font-size:15px; }
+  #lobby.sub .waaier-kaart .midden{ font-size:38px; }
+  #lobby.sub .menu-name{ font-size:40px; margin-top:16px; }
+  #lobby.sub .account-balk:not(.ingelogd){ display:none; }
+  #lobby .account-balk{ margin:22px 0 0 0; }
+  #menuButtons, .menu-subpanel{ margin-top:22px; }
+  @media (prefers-reduced-motion: reduce){
+    .waaier-kaart, .menu-name{ transition:none; }
+  }
+
+  /* Hoofdknoppen. Elke knop heeft een vaste "dikte" (de onderste schaduw) die bij het indrukken
+     wegzakt, zoals een kaart die je op tafel drukt. */
   .menu-btn{
-    display:flex; align-items:center; justify-content:center; gap:8px;
-    width:100%; padding:16px; margin:8px 0; font-size:16px;
-    background:linear-gradient(180deg, #d3b45e, var(--gold));
-    color:var(--felt-dark); border:none; border-radius:10px; font-weight:bold;
-    box-shadow:0 3px 8px rgba(0,0,0,.35);
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    width:100%; margin:0 0 12px 0; padding:18px 22px; text-align:left;
+    border-radius:14px; font-weight:900; min-height:0;
+    box-shadow:0 5px 0 var(--dikte), 0 12px 24px rgba(0,0,0,.4);
+    transition:transform .08s ease, box-shadow .08s ease, filter .15s ease;
   }
-  .menu-btn:active{ transform: translateY(1px); box-shadow:0 1px 4px rgba(0,0,0,.35); }
-  /* Hulpknoppen: kleiner en rustiger dan de hoofdacties erboven, zodat het oog eerst bij
-     Multiplayer en Solo terechtkomt. */
-  .menu-klein-rij{ display:flex; gap:10px; justify-content:center; margin:14px 0 0 0; }
-  .menu-btn-klein{
-    flex:0 1 auto; padding:8px 16px; margin:0; font-size:13px; min-height:0;
-    background:transparent; color:var(--cream); border:1px solid rgba(190,159,65,.55);
-    border-radius:999px; font-weight:bold; box-shadow:none; opacity:.85;
+  .menu-btn:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--dikte), 0 6px 14px rgba(0,0,0,.4); }
+  .menu-btn.goud, .knop-goud{
+    --dikte:#8a7229;
+    background:linear-gradient(180deg, #d3b45e, var(--gold)); color:var(--felt-dark); border:1px solid #f6e4a4;
   }
-  .menu-btn-klein:active{ transform: translateY(1px); }
+  .menu-btn.creme, .knop-creme{
+    --dikte:#b8ab90;
+    background:var(--cream); color:var(--black); border:1px solid var(--gold);
+  }
+  @media (hover:hover){
+    .menu-btn:hover, .knop-goud:hover, .knop-creme:hover{ filter:brightness(1.05); }
+  }
+  .menu-btn-tekst{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:0; }
+  .menu-btn-naam{ font-size:21px; }
+  .menu-btn-sub{ font-size:12.5px; font-weight:700; opacity:.65; }
+  .menu-btn-symbool{ font-size:32px; line-height:1; flex-shrink:0; }
+  .menu-btn-symbool.rood{ color:var(--red); }
+
+  /* Battlepass: een rode banner met je tier en de voortgang door het hele seizoen in vijf stukken
+     (elk stuk is vijf tiers). */
+  .menu-btn.bp-knop{
+    --dikte:#4a1210;
+    flex-direction:column; align-items:stretch; gap:10px; padding:14px 18px;
+    background:linear-gradient(100deg, #6e1d1a 0%, var(--red) 55%, #6e1d1a 100%);
+    color:var(--cream); border:1px solid var(--gold);
+  }
+  .bp-knop-boven{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .bp-knop-naam{ font-size:17px; letter-spacing:1.5px; text-transform:uppercase; color:#f6e4a4; }
+  .bp-knop-tier{ font-size:13px; font-weight:700; white-space:nowrap; }
+  .bp-segmenten{ display:flex; gap:5px; }
+  .bp-segment{ flex:1; height:8px; border-radius:3px; background:rgba(0,0,0,.4); overflow:hidden; }
+  .bp-segment > div{ height:100%; background:#e3c76a; }
+
+  /* Hulpknoppen: pillen naast elkaar, rustiger dan de hoofdacties erboven. */
+  .menu-klein-rij{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .menu-btn-klein, #lobby button.secondary, .knop-pil{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; margin:0; padding:13px 16px; min-height:0;
+    background:rgba(0,0,0,.25); border:1px solid rgba(190,159,65,.55); border-radius:999px;
+    color:var(--cream); font-size:14px; font-weight:700; white-space:nowrap; box-shadow:none;
+  }
+  .menu-btn-klein{ padding:14px 16px; }
+  #lobby button.secondary.subpanel-back{ margin-top:12px; }
+  .menu-btn-klein:active, #lobby button.secondary:active, .knop-pil:active{ transform:translateY(1px); }
+  @media (hover:hover){
+    .menu-btn-klein:hover, #lobby button.secondary:hover, .knop-pil:hover{ border-color:#e3c76a; }
+  }
+  .menu-btn-klein .symbool{ font-size:18px; }
+  .symbool.rood{ color:var(--red); }
   /* Account: bovenaan het menu. Niet ingelogd een knop, ingelogd je naam, niveau en XP-balk. */
   .account-balk{ margin:0 0 14px 0; }
   .account-balk:empty{ display:none; }
@@ -116,63 +201,57 @@
   .google-knop:active{ transform:translateY(1px); }
   .account-uitleg{ text-align:center; font-size:12px; opacity:.7; margin-top:6px; }
   .account-fout{ text-align:center; font-size:12px; color:#f0a3a0; margin-top:6px; }
-  /* Ingelogd: geen eigen kader, enkel een dun lijntje eronder. De XP-balk is een haarlijn met een
-     zachte gloed, zodat hij bij de rest van het menu past in plaats van de aandacht te trekken. */
+  /* Ingelogd: enkel een klein chipje rechtsboven in het menu, met je foto en naam. Je tier en XP
+     staan op de battlepass-knop en in het battlepass-scherm, dus die hoeven hier niet nog eens. */
+  #lobby{ display:flex; flex-direction:column; }
+  #lobby .account-balk.ingelogd{ order:-1; align-self:flex-end; margin:8px 0 0 0; max-width:75%; }
   .account-kaart{
-    display:flex; align-items:center; gap:12px;
-    padding:0 2px 12px 2px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:7px; padding:3px 10px 3px 3px;
+    background:rgba(0,0,0,.25); border:1px solid rgba(190,159,65,.35); border-radius:999px;
+    font-size:11.5px; opacity:.85;
   }
   .account-foto{
-    width:36px; height:36px; border-radius:50%; flex-shrink:0; object-fit:cover;
-    border:1.5px solid rgba(190,159,65,.75); background:var(--felt-dark);
-    display:flex; align-items:center; justify-content:center; color:var(--gold); font-weight:bold; font-size:15px;
+    width:20px; height:20px; border-radius:50%; flex-shrink:0; object-fit:cover;
+    border:1px solid rgba(190,159,65,.75); background:var(--felt-dark);
+    display:flex; align-items:center; justify-content:center; color:var(--gold); font-weight:bold; font-size:10px;
   }
-  .account-midden{ flex:1; min-width:0; }
-  .account-boven{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
-  .account-naam{ font-weight:bold; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .account-naam{ font-weight:700; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .account-uit{
-    flex-shrink:0; margin:0; padding:0; min-height:0; font-size:11px; font-weight:normal;
-    background:none; border:none; color:var(--cream); opacity:.45;
-    text-decoration:underline; text-underline-offset:2px;
+    flex-shrink:0; margin:0; padding:0 0 0 7px; min-height:0; font-size:11px; font-weight:normal;
+    background:none; border:none; border-left:1px solid rgba(242,234,217,.2); border-radius:0;
+    color:var(--cream); opacity:.55;
   }
-  .xp-rij{ display:flex; align-items:center; gap:8px; margin-top:6px; }
-  .xp-tier{
-    font-size:10px; letter-spacing:1.2px; text-transform:uppercase; font-weight:bold;
-    color:var(--gold); white-space:nowrap;
-  }
+  @media (hover:hover){ .account-uit:hover{ opacity:.9; text-decoration:underline; } }
+  #lobby .account-balk.ingelogd .account-fout{ text-align:right; margin-top:4px; font-size:11px; }
   .xp-balk{ flex:1; height:3px; border-radius:2px; background:rgba(242,234,217,.12); overflow:hidden; }
   .xp-balk > div{
     height:100%; border-radius:2px; background:var(--gold);
     box-shadow:0 0 6px rgba(190,159,65,.7); transition:width .5s ease;
   }
-  .xp-getal{ font-size:10px; opacity:.5; white-space:nowrap; font-variant-numeric:tabular-nums; }
   .xp-tekst{ font-size:10px; opacity:.6; margin-top:5px; }
   /* "+30 XP" onder de winnaarsbanner. */
   .xp-melding{ text-align:center; font-size:14px; color:var(--gold); font-weight:bold; margin:2px 0 6px 0; }
   .xp-melding.zacht{ color:var(--cream); font-weight:normal; font-size:12px; opacity:.7; }
   .xp-melding .nieuw{ display:block; font-size:12px; color:var(--cream); font-weight:normal; margin-top:2px; }
 
-  /* Battlepass-knop in het menu: dezelfde maat als de hoofdknoppen, maar donker met een gouden rand,
-     zodat hij opvalt zonder met Multiplayer en Solo te concurreren. */
-  .menu-btn.bp-knop{
-    background:linear-gradient(180deg, rgba(190,159,65,.20), rgba(190,159,65,.05));
-    color:var(--gold); border:1px solid rgba(190,159,65,.75);
-    box-shadow:0 3px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.07);
-  }
-  .bp-knop-tier{
-    font-size:11px; letter-spacing:.8px; padding:2px 8px; border-radius:999px;
-    background:var(--gold); color:var(--felt-dark);
-  }
-
   /* Het battlepass-scherm */
   .bp-kop{ display:flex; align-items:center; gap:14px; margin:4px 0 14px 0; }
-  .bp-tiergetal{ text-align:center; flex-shrink:0; width:62px; }
-  .bp-tiergetal .label{ font-size:9px; letter-spacing:1.5px; text-transform:uppercase; opacity:.6; }
-  .bp-tiergetal .getal{ font-size:30px; font-weight:bold; color:var(--gold); line-height:1.05; font-family:'Trebuchet MS', Helvetica, sans-serif; }
-  .bp-tiergetal .van{ font-size:10px; opacity:.5; }
+  /* Ingelogd: je tier op dezelfde rode banner als de knop in het menu. */
+  .bp-kop.banner{
+    padding:12px 14px; border-radius:14px; border:1px solid var(--gold);
+    background:linear-gradient(100deg, #6e1d1a 0%, var(--red) 55%, #6e1d1a 100%);
+    box-shadow:0 5px 0 #4a1210, 0 12px 24px rgba(0,0,0,.4);
+  }
+  .bp-tiergetal{ text-align:center; flex-shrink:0; width:58px; }
+  .bp-tiergetal .label{ font-size:9px; letter-spacing:1.5px; text-transform:uppercase; opacity:.8; }
+  .bp-tiergetal .getal{ font-size:34px; font-weight:900; color:#f6e4a4; line-height:1.05; font-family:'Playfair Display', Georgia, serif; }
+  .bp-tiergetal .van{ font-size:10px; opacity:.7; }
   .bp-voortgang{ flex:1; min-width:0; }
-  .bp-voortgang .xp-balk{ height:4px; }
-  .bp-voortgang .xp-tekst{ margin-top:6px; }
+  .bp-voortgang .xp-balk{ height:8px; border-radius:999px; background:rgba(0,0,0,.4); }
+  .bp-voortgang .xp-balk > div{
+    border-radius:999px; background:linear-gradient(90deg, #d3b45e, #f6e4a4); box-shadow:0 0 6px rgba(227,199,106,.7);
+  }
+  .bp-voortgang .xp-tekst{ margin-top:7px; font-size:11.5px; font-weight:700; opacity:1; }
   .bp-inlog{ margin:2px 0 14px 0; }
   .bp-spoor{ display:flex; flex-direction:column; }
   .bp-stap{ display:flex; align-items:stretch; gap:12px; }
@@ -192,22 +271,28 @@
     width:6px; height:6px; border-radius:50%; position:relative;
     background:var(--felt-dark); border:1px solid rgba(242,234,217,.25);
   }
-  .bp-punt.aan{ background:var(--gold); border-color:var(--gold); }
+  .bp-punt.aan{ background:#e3c76a; border-color:#e3c76a; }
   .bp-bol{
     width:30px; height:30px; border-radius:50%; position:relative; flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
-    font-size:11px; font-weight:bold; font-variant-numeric:tabular-nums;
+    font-size:11.5px; font-weight:900; font-variant-numeric:tabular-nums;
     background:var(--felt-dark); border:1.5px solid rgba(242,234,217,.25); color:rgba(242,234,217,.6);
   }
-  .bp-stap.vrij .bp-bol{ background:var(--gold); border-color:var(--gold); color:var(--felt-dark); }
-  .bp-stap.volgende .bp-bol{ border-color:var(--gold); color:var(--gold); box-shadow:0 0 10px rgba(190,159,65,.45); }
+  .bp-stap.vrij .bp-bol{
+    background:linear-gradient(180deg, #e3c76a, var(--gold)); border-color:#f6e4a4; color:var(--felt-dark);
+    box-shadow:0 2px 0 #8a7229;
+  }
+  .bp-stap.volgende .bp-bol{ border-color:#e3c76a; color:#e3c76a; box-shadow:0 0 12px rgba(227,199,106,.55); }
   .bp-beloning{
     flex:1; min-width:0; display:flex; align-items:center; gap:12px; margin-top:8px;
-    padding:10px 12px; border-radius:10px;
+    padding:10px 12px; border-radius:12px;
     background:rgba(0,0,0,.2); border:1px solid var(--line);
   }
   .bp-stap.vrij .bp-beloning{ border-color:rgba(190,159,65,.45); }
-  .bp-stap.volgende .bp-beloning{ border-color:var(--gold); background:rgba(190,159,65,.10); }
+  .bp-stap.volgende .bp-beloning{
+    border-color:#e3c76a; background:linear-gradient(100deg, rgba(110,29,26,.55), rgba(179,49,44,.35));
+    box-shadow:0 0 14px rgba(227,199,106,.2);
+  }
   .bp-voorbeeld{ flex-shrink:0; position:relative; min-width:52px; display:flex; justify-content:center; }
   .bp-stap.dicht .bp-voorbeeld > *, .bp-stap.volgende .bp-voorbeeld > *{ filter:saturate(.35) brightness(.75); }
   .bp-slot{
@@ -228,19 +313,27 @@
   }
   .bp-info{ min-width:0; }
   .bp-soort{ font-size:9px; letter-spacing:1.3px; text-transform:uppercase; opacity:.55; }
-  .bp-naam{ font-weight:bold; color:var(--gold); font-size:14px; margin-top:1px; }
+  .bp-naam{ font-weight:900; color:#e3c76a; font-size:14px; margin-top:1px; }
   .bp-status{ font-size:11px; opacity:.75; margin-top:2px; }
   .bp-stap.vrij .bp-status{ color:#9fd8a8; opacity:1; }
   .bp-uitleg-kop{
-    margin:18px 0 8px 0; text-align:center; font-size:11px; letter-spacing:1.2px;
-    text-transform:uppercase; opacity:.6;
+    margin:18px 0 8px 0; text-align:center; font-size:11px; font-weight:900; letter-spacing:1.5px;
+    text-transform:uppercase; color:var(--gold);
   }
-  .bp-xp-tabel{ width:100%; border-collapse:collapse; font-size:12px; }
-  .bp-xp-tabel th{ font-size:10px; font-weight:normal; opacity:.55; text-align:right; padding:3px 6px; }
-  .bp-xp-tabel th:first-child{ text-align:left; }
-  .bp-xp-tabel td{ padding:4px 6px; text-align:right; border-top:1px solid rgba(47,107,83,.5); font-variant-numeric:tabular-nums; }
-  .bp-xp-tabel td:first-child{ text-align:left; }
-  .bp-xp-tabel td.winst{ color:var(--gold); font-weight:bold; }
+  .bp-xp-tabel{
+    width:100%; border-collapse:separate; border-spacing:0; font-size:12.5px;
+    border:1px solid var(--line); border-radius:12px; overflow:hidden;
+  }
+  .bp-xp-tabel th{
+    font-size:10px; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--gold);
+    text-align:left; padding:8px 12px; background:rgba(0,0,0,.3);
+  }
+  .bp-xp-tabel td{ padding:7px 12px; text-align:left; border-top:1px solid rgba(47,107,83,.6); font-variant-numeric:tabular-nums; }
+  .bp-xp-tabel td:first-child{ font-weight:700; }
+  .bp-xp-tabel tr:nth-child(odd) td{ background:rgba(0,0,0,.12); }
+  .bp-xp-tabel td.winst{ color:#e3c76a; font-weight:900; }
+  .bp-xp-tabel .bron{ opacity:.6; font-weight:700; }
+  .bp-xp-tabel .bron.goud{ color:#e3c76a; opacity:1; }
   .bp-noot{ font-size:11px; opacity:.55; text-align:center; margin-top:8px; }
 
   /* Vergrendelde designs in de lijst en vergrendelde emotes in de kiezer. */
@@ -250,39 +343,68 @@
     font-size:10px; font-weight:bold; color:var(--cream); background:rgba(0,0,0,.35); border:1px solid var(--line);
   }
   .menu-subpanel{
-    background:rgba(0,0,0,.25); border:1px solid var(--line); border-radius:10px;
-    padding:14px; margin:0 0 8px 0;
+    background:rgba(0,0,0,.25); border:1px solid var(--line); border-radius:16px;
+    padding:16px; margin-bottom:8px;
   }
-  .btn-row{ display:flex; flex-direction:row; gap:10px; }
-  .btn-row button{ flex:1; margin:0; text-align:center; padding:12px 6px; font-size:13px; }
   .subpanel-title{
-    text-align:center; color:var(--gold); font-family:'Trebuchet MS', Helvetica, sans-serif;
-    font-size:14px; letter-spacing:1.5px; text-transform:uppercase; font-weight:bold;
-    margin:0 0 10px 0; padding-bottom:8px; border-bottom:1px solid var(--line);
+    text-align:center; color:#e3c76a; font-family:'Playfair Display', Georgia, serif;
+    font-size:21px; font-weight:900; line-height:1.3;
+    margin:0 0 12px 0; padding-bottom:10px; border-bottom:1px solid rgba(190,159,65,.35);
   }
   .subpanel-back{ display:block; width:100%; margin:12px 0 0 0; text-align:center; }
   /* Hoofdactie van het multiplayer-paneel op volle breedte: hij stond op halve breedte naast een
      volle-breedte "Terug"-knop, wat er onafgewerkt uitzag. */
-  .subpanel-primary{ display:block; width:100%; margin:8px 0 0 0; text-align:center; }
+  .subpanel-primary{
+    --dikte:#8a7229;
+    display:block; width:100%; margin:12px 0 0 0; padding:16px; text-align:center;
+    border-radius:14px; font-size:17px; font-weight:900; min-height:0;
+    background:linear-gradient(180deg, #d3b45e, var(--gold)); color:var(--felt-dark); border:1px solid #f6e4a4;
+    box-shadow:0 5px 0 var(--dikte), 0 12px 24px rgba(0,0,0,.4);
+    transition:transform .08s ease, box-shadow .08s ease;
+  }
+  .subpanel-primary:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--dikte), 0 6px 14px rgba(0,0,0,.4); }
+
+  /* Multiplayer: het codeveld over de volle breedte, als een ingelegd vakje. */
+  #roomInput{
+    display:block; width:100%; height:54px; margin:8px 0 12px 0; padding:0 12px;
+    text-align:center; font-family:inherit; font-size:24px; font-weight:900; letter-spacing:8px;
+    background:rgba(0,0,0,.35); border:1px solid var(--gold); border-radius:12px; color:var(--cream);
+    box-shadow:inset 0 2px 6px rgba(0,0,0,.5);
+  }
+  #roomInput::placeholder{ color:rgba(242,234,217,.35); text-transform:none; }
+  #roomInput:focus{ outline:none; border-color:#e3c76a; box-shadow:inset 0 2px 6px rgba(0,0,0,.5), 0 0 0 2px rgba(227,199,106,.3); }
+  #multiplayerPanel .status-line{ font-size:13px; opacity:.85; }
+  #multiplayerPanel .uitleg{ font-size:12px; line-height:1.5; opacity:.7; text-align:center; margin:12px 0 0 0; }
+
+  /* Solo spelen: twee tegels naast elkaar. */
+  .solo-tegels{ display:flex; gap:12px; margin-top:4px; }
+  .solo-tegel{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:8px;
+    margin:0; padding:18px 8px; border-radius:14px; font-size:16px; font-weight:900; min-height:0;
+    box-shadow:0 5px 0 var(--dikte), 0 12px 24px rgba(0,0,0,.4);
+    transition:transform .08s ease, box-shadow .08s ease;
+  }
+  .solo-tegel:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--dikte), 0 6px 14px rgba(0,0,0,.4); }
+  .solo-tegel .symbool{ font-size:28px; line-height:1; }
 
   /* Tegen AI: kleur, moeilijkheid en de tegenstander die erbij hoort. De kleur van de gekozen stand
      (--niveau-kleur en --niveau-gloed, gezet vanuit het script) loopt door in de slider, de rand rond
      het mannetje en zijn naam: van groen (Bob, makkelijk) naar rood (Stefaan, moeilijk). */
   #aiPanel{ --niveau-kleur:#f0c233; --niveau-gloed:rgba(240,194,51,.35); }
   .ai-label{
-    text-align:center; font-size:11px; letter-spacing:1px; text-transform:uppercase;
-    opacity:.7; margin:18px 0 8px 0;
+    text-align:center; font-size:11px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--gold); margin:18px 0 8px 0;
   }
   .ai-label.eerste{ margin-top:0; }
   .ai-kleurkeuze{ display:flex; gap:10px; }
   .ai-kleurknop{
-    flex:1; margin:0; padding:12px 6px; font-size:14px;
+    flex:1; margin:0; padding:12px 6px; font-size:14px; font-weight:900;
     display:flex; align-items:center; justify-content:center; gap:8px;
-    background:rgba(0,0,0,.18); color:var(--cream); border:1px solid var(--line); border-radius:10px;
+    background:rgba(0,0,0,.18); color:var(--cream); border:1px solid var(--line); border-radius:12px;
   }
   .ai-kleurknop:active{ transform:translateY(1px); }
   .ai-kleurknop.gekozen{
-    background:rgba(190,159,65,.16); border-color:var(--gold); color:var(--gold);
+    background:rgba(190,159,65,.16); border-color:#e3c76a; color:#e3c76a;
     box-shadow:inset 0 0 0 1px var(--gold);
   }
   .kleurstip{ width:14px; height:14px; border-radius:50%; border:1px solid var(--gold); flex-shrink:0; }
@@ -340,12 +462,12 @@
 
   .ai-tegenstander-kaart{
     display:flex; flex-direction:column; align-items:center; text-align:center;
-    margin:12px 0 0 0; padding:16px 14px 12px;
+    margin:12px 0 0 0; padding:16px 14px 14px;
     background:radial-gradient(ellipse 75% 65% at 50% 0%, var(--niveau-gloed), transparent 75%), rgba(0,0,0,.18);
-    border:1px solid var(--line); border-radius:12px;
+    border:1px solid var(--line); border-radius:14px;
   }
   .ai-avatar{
-    width:85px; height:85px; border-radius:50%; overflow:hidden; flex-shrink:0;
+    width:80px; height:80px; border-radius:50%; overflow:hidden; flex-shrink:0;
     border:4px solid var(--niveau-kleur); background:#0b2a20;
     box-shadow:0 4px 12px rgba(0,0,0,.45), 0 0 24px var(--niveau-gloed);
     transition:border-color .25s ease, box-shadow .25s ease;
@@ -358,12 +480,12 @@
     100%{ transform:scale(1); }
   }
   .ai-naam{
-    margin-top:8px; font-family:'Trebuchet MS', Helvetica, sans-serif; font-size:20px; font-weight:bold;
-    letter-spacing:1px; color:var(--niveau-kleur); text-shadow:0 2px 4px rgba(0,0,0,.45);
+    margin-top:8px; font-family:'Playfair Display', Georgia, serif; font-size:22px; font-weight:900;
+    color:var(--niveau-kleur); text-shadow:0 2px 4px rgba(0,0,0,.45);
   }
   .ai-graad{
     margin-top:3px; padding:2px 9px; border-radius:999px;
-    font-size:9.5px; font-weight:bold; letter-spacing:.8px; text-transform:uppercase;
+    font-size:9.5px; font-weight:900; letter-spacing:.8px; text-transform:uppercase;
     background:var(--niveau-kleur); color:#14110b;
   }
   .ai-uitleg{ margin-top:10px; max-width:340px; font-size:12.5px; line-height:1.5; opacity:.88; }
@@ -396,8 +518,8 @@
   .subpanel-terug{
     position:absolute; left:0; top:-5px; z-index:1;
     margin:0; padding:5px 10px; min-height:0;
-    background:rgba(0,0,0,.2); border:1px solid rgba(190,159,65,.6); border-radius:999px; box-shadow:none;
-    color:var(--gold); font-size:12px; font-weight:bold; line-height:1;
+    background:rgba(0,0,0,.25); border:1px solid rgba(190,159,65,.55); border-radius:999px; box-shadow:none;
+    color:#e3c76a; font-size:12px; font-weight:700; line-height:1;
     letter-spacing:.5px;
   }
   .subpanel-terug:active{ background:rgba(190,159,65,.18); transform:translateY(1px); }
@@ -406,8 +528,8 @@
      staan, zodat toetsenbord en voorleessoftware er gewoon bij kunnen; .schuif tekent wat je ziet. */
   .tafel-schakelaar{
     display:flex; align-items:flex-start; gap:12px; width:100%;
-    margin:10px 0 0 0; padding:10px;
-    background:rgba(0,0,0,.18); border:1px solid var(--line); border-radius:10px;
+    margin:12px 0 0 0; padding:10px;
+    background:rgba(0,0,0,.18); border:1px solid var(--line); border-radius:12px;
     cursor:pointer; user-select:none; touch-action:manipulation;
   }
   .tafel-schakelaar input{
@@ -435,7 +557,7 @@
   }
   .tafel-schakelaar input:focus-visible + .schuif{ outline:2px solid var(--gold); outline-offset:2px; }
   .schakelaar-tekst{ min-width:0; }
-  .schakelaar-naam{ display:block; font-weight:bold; color:var(--gold); font-size:14px; }
+  .schakelaar-naam{ display:block; font-weight:900; color:#e3c76a; font-size:14px; }
   .schakelaar-uitleg{ display:block; font-size:11px; opacity:.75; margin-top:2px; }
 
   /* Keuzelijst met kaartdesigns. Elke rij zet de variabelen van zijn eigen design, zodat de
@@ -443,16 +565,21 @@
   .skin-rij{
     display:flex; align-items:center; gap:12px; width:100%;
     margin:8px 0 0 0; padding:10px; text-align:left;
-    background:rgba(0,0,0,.18); border:1px solid var(--line); border-radius:10px;
+    background:rgba(0,0,0,.18); border:1px solid var(--line); border-radius:12px;
     color:var(--cream); font-family:inherit; cursor:pointer;
     user-select:none; touch-action:manipulation;
   }
   .skin-rij:active{ transform:translateY(1px); }
-  .skin-rij.gekozen{ border-color:var(--gold); background:rgba(190,159,65,.14); box-shadow:inset 0 0 0 1px var(--gold); }
+  .skin-rij.gekozen{ border-color:#e3c76a; background:rgba(190,159,65,.16); box-shadow:inset 0 0 0 1px var(--gold); }
+  @media (hover:hover){ .skin-rij:hover{ border-color:var(--gold); } }
+  /* Rechts in de rij: "Gekozen", of het slotje met de tier waarop je het design vrijspeelt. */
   .skin-merk{
-    margin-left:8px; font-size:10px; font-weight:bold; letter-spacing:.5px;
-    background:var(--gold); color:var(--felt-dark); border-radius:999px; padding:2px 8px;
-    vertical-align:middle;
+    flex-shrink:0; margin-left:auto; font-size:10px; font-weight:900; letter-spacing:.5px; text-transform:uppercase;
+    background:#e3c76a; color:var(--felt-dark); border-radius:999px; padding:3px 8px;
+  }
+  .skin-rij .skin-slot{
+    flex-shrink:0; margin-left:auto; padding:3px 8px; white-space:nowrap; font-weight:900;
+    border-color:var(--red); background:rgba(179,49,44,.25);
   }
   .skin-proef{ display:flex; gap:4px; flex-shrink:0; }
   .skin-kaart{
@@ -470,7 +597,9 @@
     box-shadow:var(--card-shadow); border:1px solid var(--gold);
   }
   .skin-tekst{ min-width:0; }
-  .skin-naam{ font-weight:bold; color:var(--gold); font-size:14px; }
+  .skin-naam{ font-weight:900; color:#e3c76a; font-size:14px; }
+  .skin-rij.op-slot .skin-naam{ color:rgba(242,234,217,.7); }
+
   .skin-uitleg{ font-size:11px; opacity:.75; margin-top:2px; }
   .panel{
     max-width:520px; width:100%; margin:0 auto 10px auto;
@@ -480,8 +609,10 @@
     padding:12px 12px;
   }
   #lobby{ margin-top:0; }
+  /* Bovenaan uitgelijnd, niet gecentreerd: anders verspringt de kaartwaaier bij elk subscherm,
+     omdat elk paneel een andere hoogte heeft. */
   .lobby-wrap{
-    display:flex; align-items:center; justify-content:center;
+    display:flex; align-items:flex-start; justify-content:center;
     min-height:calc(100vh / var(--ui-scale) - 16px - 14px - env(safe-area-inset-bottom));
   }
   input[type=text]{
@@ -730,30 +861,54 @@
     padding:16px; overflow-y:auto;
   }
   .rules-box{
-    background:#0d3226; border:1px solid var(--gold); border-radius:12px;
-    max-width:560px; width:100%; padding:20px 18px 24px 18px;
-    box-shadow:0 8px 30px rgba(0,0,0,.6);
+    background:linear-gradient(180deg, #0d4535, var(--felt-dark)); border:1px solid var(--gold); border-radius:18px;
+    max-width:560px; width:100%; padding:20px 18px 0 18px;
+    box-shadow:0 20px 50px rgba(0,0,0,.6); color:rgba(242,234,217,.9);
   }
   .rules-box h2.rtitle{
-    font-family:'Trebuchet MS',sans-serif; text-align:center; letter-spacing:2px;
-    color:var(--gold); text-transform:uppercase; margin:0 0 4px 0;
+    font-family:'Playfair Display', Georgia, serif; font-weight:900; font-size:30px; line-height:1;
+    text-align:center; color:#e3c76a; text-shadow:0 2px 0 #6e5a1e; margin:0;
   }
-  .rules-box .rsub{ text-align:center; font-size:12px; opacity:.7; margin-bottom:14px; }
-  .rules-box h3{ color:var(--gold); font-size:14px; margin:18px 0 6px 0; border-bottom:1px solid var(--line); padding-bottom:4px; }
-  .rules-box h4{ color:#e8c96a; font-size:12.5px; margin:12px 0 4px 0; }
-  .rules-box p, .rules-box li{ font-size:12.5px; line-height:1.55; margin:5px 0; }
+  .rules-box .rsub{
+    text-align:center; margin:6px -18px 4px; padding-bottom:12px; border-bottom:1px solid rgba(190,159,65,.35);
+    font-size:11px; font-weight:900; letter-spacing:2px; text-transform:uppercase; opacity:.7;
+  }
+  .rules-box h3{
+    font-family:'Playfair Display', Georgia, serif; font-weight:900; font-size:18px;
+    color:#e3c76a; margin:18px 0 6px 0;
+  }
+  .rules-box h4{ color:#e3c76a; font-size:13.5px; font-weight:900; margin:14px 0 4px 0; }
+  .rules-box p, .rules-box li{ font-size:13px; line-height:1.55; margin:5px 0; }
   .rules-box ul, .rules-box ol{ padding-left:20px; margin:6px 0; }
   .rules-box table{ width:100%; border-collapse:collapse; font-size:11.5px; margin:8px 0; }
   .rules-box th, .rules-box td{ border:1px solid var(--line); padding:6px 7px; text-align:left; }
   .rules-box th{ background:rgba(201,162,39,.2); }
-  .rules-box .rcallout{ background:rgba(201,162,39,.12); border-left:3px solid var(--gold); padding:8px 10px; border-radius:4px; margin:8px 0; font-size:12px; }
-  .rules-box .rcallout.warn{ border-left-color:var(--red); background:rgba(179,49,44,.12); }
-  .rules-actions{ display:flex; gap:8px; justify-content:center; margin-top:16px; flex-wrap:wrap; }
-  .pdf-download-btn{
-    display:inline-block; text-decoration:none; padding:10px 16px; border-radius:8px;
-    background:#3b7dd8; color:#fff; font-weight:bold; font-size:14px; border:1px solid #2d5fa8;
+  .rules-box .rcallout{
+    background:rgba(190,159,65,.12); border:1px solid rgba(190,159,65,.45); padding:10px 12px;
+    border-radius:10px; margin:10px 0; font-size:12.5px; line-height:1.5;
   }
-  .pdf-download-btn:active{ background:#2d5fa8; }
+  .rules-box .rcallout.warn{ border-color:rgba(179,49,44,.7); background:rgba(179,49,44,.14); }
+  /* De knoppen blijven onderaan in beeld terwijl je door de regels scrolt. */
+  .rules-actions{
+    position:sticky; bottom:-16px; z-index:1;   /* -16px: de binnenrand van .rules-overlay */
+    display:grid; grid-template-columns:1fr 1fr; gap:10px;
+    margin:16px -18px 0; padding:12px 16px 16px;
+    background:var(--felt-dark); border-top:1px solid rgba(190,159,65,.35);
+    border-radius:0 0 18px 18px;
+  }
+  .rules-actions > *{ margin:0; }
+  .pdf-download-btn{
+    display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none;
+    padding:11px 10px; border-radius:999px; white-space:nowrap;
+    background:rgba(0,0,0,.25); border:1px solid rgba(190,159,65,.55); color:var(--cream);
+    font-weight:700; font-size:13px;
+  }
+  .pdf-download-btn:active{ transform:translateY(1px); }
+  .rules-actions .knop-goud{
+    --dikte:#8a7229; padding:11px; border-radius:999px; font-size:13px; font-weight:900; min-height:0;
+    box-shadow:0 5px 0 var(--dikte), 0 12px 24px rgba(0,0,0,.4);
+  }
+  .rules-actions .knop-goud:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--dikte), 0 6px 14px rgba(0,0,0,.4); }
 </style>
 </head>
 <body>
@@ -846,7 +1001,8 @@
 
     <div class="rules-actions">
       <a id="rulesPdfLink" class="pdf-download-btn" download="baarden-spelregels.pdf" href="#">⬇ Download als PDF</a>
-      <button class="secondary" onclick="closeRules()">Sluiten</button>
+      <button class="knop-goud" onclick="closeRules()">Sluiten</button>
+
     </div>
   </div>
 </div>
@@ -857,27 +1013,41 @@
 
 <div id="lobbyWrap" class="lobby-wrap">
 <div class="panel" id="lobby">
-  <div class="menu-title">
+  <div class="menu-kop">
+    <div class="menu-waaier" aria-hidden="true">
+      <div class="waaier-kaart rug" style="--x:-86px; --r:-24deg; --y:26px;"></div>
+      <div class="waaier-kaart" style="--x:-30px; --r:-8deg; --y:4px;"><div class="hoek">K<br><span>♠</span></div><div class="midden">♠</div></div>
+      <div class="waaier-kaart rood" style="--x:30px; --r:8deg; --y:4px;"><div class="hoek">A<br><span>♥</span></div><div class="midden">♥</div></div>
+      <div class="waaier-kaart rood" style="--x:86px; --r:24deg; --y:26px;"><div class="hoek">Q<br><span>♦</span></div><div class="midden">♦</div></div>
+    </div>
     <div class="menu-name">Baarden</div>
-    <div class="menu-suits"><span class="red">♥ ♦</span><span class="black">♠ ♣</span></div>
   </div>
 
   <div id="accountBalk" class="account-balk"></div>
 
   <div id="menuButtons">
-    <button class="menu-btn" onclick="openMenuPanel('multiplayer')">🌐 Multiplayer</button>
-    <button class="menu-btn" onclick="openMenuPanel('solo')">Solo spelen</button>
-    <button class="menu-btn bp-knop" onclick="openMenuPanel('battlepass')">🏆 Battlepass <span id="bpKnopTier" class="bp-knop-tier" style="display:none;"></span></button>
+    <button class="menu-btn goud" onclick="openMenuPanel('multiplayer')">
+      <span class="menu-btn-tekst"><span class="menu-btn-naam">Multiplayer</span><span class="menu-btn-sub">Online met een kamercode</span></span>
+      <span class="menu-btn-symbool" aria-hidden="true">♠</span>
+    </button>
+    <button class="menu-btn creme" onclick="openMenuPanel('solo')">
+      <span class="menu-btn-tekst"><span class="menu-btn-naam">Solo spelen</span><span class="menu-btn-sub">Solo Game of tegen AI</span></span>
+      <span class="menu-btn-symbool rood" aria-hidden="true">♥</span>
+    </button>
+    <button class="menu-btn bp-knop" onclick="openMenuPanel('battlepass')">
+      <span class="bp-knop-boven"><span class="bp-knop-naam">Battlepass</span><span id="bpKnopTier" class="bp-knop-tier">Bekijk ›</span></span>
+      <span id="bpKnopSegmenten" class="bp-segmenten" aria-hidden="true"></span>
+    </button>
     <div class="menu-klein-rij">
-      <button class="menu-btn-klein" onclick="openRules()">📖 Spelregels</button>
-      <button class="menu-btn-klein" onclick="openMenuPanel('skins')">🎨 Kaartdesigns</button>
+      <button class="menu-btn-klein" onclick="openRules()"><span class="symbool rood" aria-hidden="true">♦</span>Spelregels</button>
+      <button class="menu-btn-klein" onclick="openMenuPanel('skins')"><span class="symbool" aria-hidden="true">♣</span>Kaartdesigns</button>
     </div>
   </div>
 
   <div id="skinPanel" class="menu-subpanel" style="display:none;">
     <div class="subpanel-kop">
       <button class="subpanel-terug" onclick="openMenuPanel(null)">← Terug</button>
-      <div class="subpanel-title">🎨 Kaartdesigns</div>
+      <div class="subpanel-title">Kaartdesigns</div>
     </div>
     <div class="status-line" style="text-align:center; margin-top:0; opacity:.75; font-size:12px;">
       Alleen jouw scherm verandert. Je tegenstander houdt zijn eigen design en het spel blijft
@@ -897,19 +1067,19 @@
   <div id="battlepassPanel" class="menu-subpanel" style="display:none;">
     <div class="subpanel-kop">
       <button class="subpanel-terug" onclick="openMenuPanel(null)">← Terug</button>
-      <div class="subpanel-title">🏆 Battlepass</div>
+      <div class="subpanel-title">Battlepass</div>
     </div>
     <div id="bpInhoud"></div>
   </div>
 
   <div id="multiplayerPanel" class="menu-subpanel" style="display:none;">
-    <div class="subpanel-title">🌐 Multiplayer</div>
+    <div class="subpanel-title">Multiplayer</div>
     <div class="status-line">Kamercode (deel dit met het andere device):</div>
     <input type="text" id="roomInput" maxlength="6" placeholder="bv. ABC1">
-    <button class="secondary" onclick="generateRoomCode()">🎲 Genereer code</button>
+    <button class="secondary" onclick="generateRoomCode()"><span class="symbool rood" aria-hidden="true">♦</span>Genereer code</button>
     <button class="subpanel-primary" onclick="joinRoom()">Kamer starten / joinen</button>
     <div class="transient" id="lobbyMsg"></div>
-    <div class="status-line" style="opacity:.7; font-size:12px;">
+    <div class="uitleg">
       Beide devices vullen dezelfde code in. Wie als eerste komt speelt Rood, de tweede Zwart.
     </div>
     <button class="secondary subpanel-back" onclick="openMenuPanel(null)">← Terug</button>
@@ -917,15 +1087,16 @@
 
   <div id="soloPanel" class="menu-subpanel" style="display:none;">
     <div class="subpanel-title">Solo spelen</div>
-    <div class="btn-row">
-      <button onclick="startSolo()">Solo Game</button>
-      <button onclick="openMenuPanel('ai')">🤖 Tegen AI</button>
+    <div class="solo-tegels">
+      <button class="solo-tegel knop-creme" onclick="startSolo()"><span class="symbool rood" aria-hidden="true">♥</span>Solo Game</button>
+      <button class="solo-tegel knop-goud" onclick="openMenuPanel('ai')"><span class="symbool" aria-hidden="true">♠</span>Tegen AI</button>
     </div>
     <button class="secondary subpanel-back" onclick="openMenuPanel(null)">← Terug</button>
   </div>
 
   <div id="aiPanel" class="menu-subpanel" style="display:none;">
-    <div class="subpanel-title">🤖 Tegen AI</div>
+    <div class="subpanel-title">Tegen AI</div>
+
     <div class="ai-label eerste">Jouw kleur</div>
     <div class="ai-kleurkeuze" role="radiogroup" aria-label="Jouw kleur">
       <button type="button" class="ai-kleurknop" data-kleur="red" role="radio" onclick="kiesAiKleur('red')"><span class="kleurstip red"></span>Rood</button>
@@ -2499,6 +2670,7 @@ function openMenuPanel(name){
     if(el) el.style.display = 'none';
   });
   document.getElementById('menuButtons').style.display = name ? 'none' : 'block';
+  document.getElementById('lobby').classList.toggle('sub', !!name);   // kleinere kaartwaaier bovenaan
   if(name && MENU_PANELS[name]) document.getElementById(MENU_PANELS[name]).style.display = 'block';
   if(name !== 'multiplayer') document.getElementById('lobbyMsg').textContent = '';
   if(name === 'skins') renderSkinLijst();
@@ -2538,18 +2710,6 @@ function renderSkinLijst(){
     const naam = document.createElement('div');
     naam.className = 'skin-naam';
     naam.textContent = skin.naam;
-    if(skin.id === actief){
-      const merk = document.createElement('span');
-      merk.className = 'skin-merk';
-      merk.textContent = 'In gebruik';
-      naam.appendChild(merk);
-    }
-    if(opSlot){
-      const slot = document.createElement('span');
-      slot.className = 'skin-slot';
-      slot.textContent = `🔒 Tier ${beloning.tier}`;
-      naam.appendChild(slot);
-    }
     const uitleg = document.createElement('div');
     uitleg.className = 'skin-uitleg';
     uitleg.textContent = opSlot ? 'Speel je vrij in de battlepass.' : skin.beschrijving;
@@ -2558,6 +2718,18 @@ function renderSkinLijst(){
 
     rij.appendChild(proef);
     rij.appendChild(tekst);
+    if(skin.id === actief){
+      const merk = document.createElement('span');
+      merk.className = 'skin-merk';
+      merk.textContent = 'Gekozen';
+      rij.appendChild(merk);
+    }
+    if(opSlot){
+      const slot = document.createElement('span');
+      slot.className = 'skin-slot';
+      slot.textContent = `🔒 Tier ${beloning.tier}`;
+      rij.appendChild(slot);
+    }
     el.appendChild(rij);
   });
 }
@@ -3142,6 +3314,7 @@ function renderAccount(){
   if(!el) return;
   const account = window.baardenAccount;
   el.innerHTML = '';
+  el.classList.toggle('ingelogd', !!(account && account.gebruiker));
   if(!account) return;   // account.js niet (of nog niet) geladen: geen balk, spelen kan gewoon
 
   if(!account.gebruiker){
@@ -3172,10 +3345,6 @@ function renderAccount(){
     kaart.appendChild(letter());
   }
 
-  const midden = document.createElement('div');
-  midden.className = 'account-midden';
-  const boven = document.createElement('div');
-  boven.className = 'account-boven';
   const naam = document.createElement('div');
   naam.className = 'account-naam';
   naam.textContent = g.naam;
@@ -3183,25 +3352,17 @@ function renderAccount(){
   uit.className = 'account-uit';
   uit.textContent = 'Uitloggen';
   uit.onclick = () => account.uitloggen();
-  boven.appendChild(naam);
-  boven.appendChild(uit);
-  midden.appendChild(boven);
-
-  const p = account.profiel;
-  if(p){
-    const t = account.tierVan(p.xp);
-    midden.insertAdjacentHTML('beforeend',
-      `<div class="xp-rij"><span class="xp-tier">Tier ${t.tier}</span>${xpBalkHTML(t)}` +
-      `<span class="xp-getal">${t.max ? 'max' : `${t.inTier}/${t.perTier}`}</span></div>`);
-  } else {
-    const laden = document.createElement('div');
-    laden.className = account.fout ? 'account-fout' : 'xp-tekst';
-    laden.style.textAlign = 'left';
-    laden.textContent = account.fout || 'Voortgang laden…';
-    midden.appendChild(laden);
-  }
-  kaart.appendChild(midden);
+  kaart.appendChild(naam);
+  kaart.appendChild(uit);
   el.appendChild(kaart);
+
+  // Lukt het laden van je voortgang niet, dan wel even zeggen; laden zelf toont de battlepass-knop al.
+  if(account.fout){
+    const fout = document.createElement('div');
+    fout.className = 'account-fout';
+    fout.textContent = account.fout;
+    el.appendChild(fout);
+  }
 }
 
 /* ======================= BATTLEPASS-SCHERM ======================= */
@@ -3244,7 +3405,7 @@ function renderBattlepass(){
   if(account && account.gebruiker && account.profiel){
     const t = account.tierVan(account.profiel.xp);
     el.insertAdjacentHTML('beforeend',
-      `<div class="bp-kop">
+      `<div class="bp-kop banner">
         <div class="bp-tiergetal"><div class="label">Tier</div><div class="getal">${t.tier}</div><div class="van">van ${BP_TIERS}</div></div>
         <div class="bp-voortgang">${xpBalkHTML(t)}
           <div class="xp-tekst">${t.max ? 'Alles vrijgespeeld. Knap gedaan! 👑' : `${t.inTier} / ${t.perTier} XP naar tier ${t.tier + 1}`}</div>
@@ -3328,8 +3489,8 @@ function renderBattlepass(){
   if(account && account.XP_REGELS){
     const r = account.XP_REGELS;
     const rij = (naam, w, v, g) => `<tr><td>${naam}</td><td class="winst">${w}</td><td>${v}</td><td>${g}</td></tr>`;
-    let rijen = rij('🌐 Online', r.online.winst, r.online.verlies, r.online.gelijk);
-    AI_TEGENSTANDERS.forEach((o, i) => { rijen += rij(`🤖 ${o.naam}`, r.ai.winst[i], r.ai.verlies[i], r.ai.gelijk[i]); });
+    let rijen = rij('<span class="bron goud">♠</span> Online', r.online.winst, r.online.verlies, r.online.gelijk);
+    AI_TEGENSTANDERS.forEach((o, i) => { rijen += rij(`<span class="bron">AI</span> ${o.naam}`, r.ai.winst[i], r.ai.verlies[i], r.ai.gelijk[i]); });
     el.insertAdjacentHTML('beforeend',
       `<div class="bp-uitleg-kop">Zo verdien je XP</div>
        <table class="bp-xp-tabel"><tr><th></th><th>Winst</th><th>Verlies</th><th>Gelijk</th></tr>${rijen}</table>
@@ -3343,15 +3504,28 @@ function toonVolgendeBeloning(){
   if(doel && huidigeTier() > 6) doel.scrollIntoView({ block:'center' });
 }
 
-// Het tiertje op de battlepass-knop in het menu.
+// De battlepass-knop in het menu: je tier, en eronder hoever je door het seizoen bent in vijf
+// stukken van elk een vijfde van de tiers. Niet ingelogd: lege stukken en "Bekijk".
+const BP_SEGMENTEN = 5;
 function renderBpKnop(){
   const el = document.getElementById('bpKnopTier');
-  if(!el) return;
+  const balk = document.getElementById('bpKnopSegmenten');
+  if(!el || !balk) return;
   const a = window.baardenAccount;
-  const tonen = !!(a && a.gebruiker && a.profiel);
-  el.style.display = tonen ? '' : 'none';
-  if(tonen) el.textContent = `Tier ${huidigeTier()}`;
+  const ingelogd = !!(a && a.gebruiker && a.profiel);
+  el.textContent = ingelogd ? `Tier ${huidigeTier()} ›` : 'Bekijk ›';
+  let deel = 0;   // 0 tot 1: van tier 1 tot de laatste tier
+  if(ingelogd){
+    const t = a.tierVan(a.profiel.xp);
+    deel = t.max ? 1 : Math.min(1, (t.tier - 1 + t.inTier / t.perTier) / (BP_TIERS - 1));
+  }
+  balk.innerHTML = '';
+  for(let i = 0; i < BP_SEGMENTEN; i++){
+    const vulling = Math.max(0, Math.min(1, deel * BP_SEGMENTEN - i));
+    balk.insertAdjacentHTML('beforeend', `<span class="bp-segment"><div style="width:${Math.round(vulling * 100)}%"></div></span>`);
+  }
 }
+
 
 // Bij elke wijziging aan je account (in- of uitloggen, profiel geladen, XP erbij): alles wat ervan
 // afhangt opnieuw tekenen, en het design opnieuw toepassen, want dat kan net vrij of op slot gegaan zijn.
@@ -3364,6 +3538,7 @@ function bijAccountWijziging(){
   if(zichtbaar('skinPanel')) renderSkinLijst();
 }
 window.addEventListener('baarden-account', bijAccountWijziging);
+renderBpKnop();   // meteen lege stukken op de knop, ook als account.js niet laadt
 
 // Een opwaardering legt de kaarten één voor één op de toren, en tussendoor wordt er hertekend (en
 // online soms ook opgeslagen). Daarom tellen we pas als de opwaardering helemaal klaar is: zolang
