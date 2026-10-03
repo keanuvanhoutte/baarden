@@ -4521,23 +4521,28 @@ function rlKlaar(){ return rlStatus === 'klaar' && window.BaardenBot && BaardenB
 // zoeker (js/eenbot_motor.js, een getrouwe overzetting van RL/eenbot.py) met het waarderingsnetwerk
 // aan de bladeren. Geen handgeschreven formules meer voor de legfase of de blok-kaart.
 //
-// GEMETEN IN DIT SPEL (js/meet_eenbot.js, 300 partijen, diepte 4, 1 wereld):
-//     EenBot tegen Stefaan met het waarderingsnetwerk   66,5% +-2,8
+// Het netwerk is na de herbouw verder getraind met zelfspel (RL/lus.py, reeks B, generatie 6:
+// 60% tegen zichzelf, 20% tegen een oudere generatie, 20% tegen deze Stefaan).
+//
+// GEMETEN IN DIT SPEL (js/meet_eenbot.js, diepte 4, 1 wereld, verse delingen):
+//     EenBot tegen Stefaan met het waarderingsnetwerk   76,5% +-2,8   (300 partijen)
+//     EenBot tegen Stefaan zonder netwerk               74,3% +-3,5   (200 partijen)
 //     controle Stefaan tegen Stefaan                     50,0%
-//     bedenktijd: mediaan 36 ms op een pc (alleen), p99 ~260 ms
-// Zie RL/resultaten/HERBOUW-LOG.md.
+//     bedenktijd: mediaan 15,5 ms op een pc (alleen), p99 ~115 ms, max ~200 ms
+// Python zei 79,3% +-2,2 (500 partijen). Zie RL/resultaten/HERBOUW-LOG.md.
 //
 // STAAT UIT tot dat besloten is. `var` en niet `let`: renderAiKeuze() kan lopen voor deze regel
 // bereikt is, en dan mag dit niet struikelen.
 var EENBOT_AAN = false;
 const EENBOT_OPTIES = { diepte: 4, werelden: 1, wortelmarge: 0.1, legpas: true, ordendiepte: 3 };
 var eenbotZoeker = null, eenbotStatus = 'ongeladen';
+// Zelfde ?v=-afspraak als WAARDERING_PAD: train ik opnieuw, dan verandert dit getal mee.
+const EENBOT_NET_PAD = 'js/eenbot_net.json?v=20261003';
 
-// Hetzelfde netwerk als het waarderingsnetwerk hierboven (zelfde bestand, dus geen extra download).
 function eenbotLaad(){
   if(eenbotStatus !== 'ongeladen' || !window.EenBot) return;
   eenbotStatus = 'laden';
-  fetch(WAARDERING_PAD)
+  fetch(EENBOT_NET_PAD)
     .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(blob => { eenbotZoeker = new EenBot.Zoeker(new EenBot.Netwerk(blob), EENBOT_OPTIES); eenbotStatus = 'klaar'; })
     .catch(err => { eenbotStatus = 'mislukt'; console.warn('Baarden: EenBot laadde niet; de oude AI speelt.', err); });
