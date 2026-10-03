@@ -219,6 +219,9 @@
     display:flex; align-items:center; justify-content:center;
     background:rgba(242,234,217,.07); border:1px solid var(--line);
   }
+  .bp-emoji.beeld{ width:56px; height:56px; border-radius:12px; overflow:hidden; padding:0; border:1px solid var(--gold); }
+  .bp-emoji.beeld svg, .bp-emoji.beeld img{ width:100%; height:100%; display:block; object-fit:cover; }
+  .bp-kaarten{ flex:1; min-width:0; display:flex; flex-direction:column; }
   .bp-ballon{
     max-width:110px; padding:6px 9px; border-radius:12px 12px 12px 3px; font-size:11.5px; line-height:1.25;
     background:var(--cream); color:var(--felt-dark); font-weight:bold;
@@ -631,6 +634,8 @@
   }
   .emote-kiezer button:active{ background:rgba(190,159,65,.35); }
   .emote-kiezer.wacht button{ opacity:.45; }
+  .emote-kiezer .emote-rooster button.beeld{ padding:3px; line-height:0; }
+  .emote-kiezer .emote-rooster button.beeld svg, .emote-kiezer .emote-rooster button.beeld img{ width:100%; height:34px; object-fit:cover; border-radius:6px; display:block; }
   /* Nog niet vrijgespeeld in de battlepass: zichtbaar, zodat je weet dat ze bestaan, maar op slot. */
   .emote-kiezer button.op-slot{ position:relative; opacity:.4; }
   .emote-kiezer button.op-slot::after{
@@ -679,6 +684,8 @@
     opacity:0; transform:translateX(-50%) scale(.6); transition:opacity .18s, transform .18s;
   }
   .emote-ballon.groot{ font-size:34px; padding:2px 12px; line-height:1.25; }
+  .emote-ballon.beeld{ padding:4px; line-height:0; }
+  .emote-ballon.beeld svg, .emote-ballon.beeld img{ width:84px; height:84px; display:block; border-radius:12px; object-fit:cover; }
   .emote-ballon.boven{ top:-6px; }
   .emote-ballon.onder{ bottom:-6px; }
   .emote-ballon::after{
@@ -2834,6 +2841,8 @@ function toggleSettings(){
 // oudere versie van het spel aan de andere kant iets onleesbaars krijgt.
 // Elke emoji heeft een eigen geluidje dat erbij past; de zinnen delen het korte popje. Herkomst en
 // licentie (allemaal CC0) staan in geluid/BRONNEN.txt. De volumes trekken ze ongeveer gelijk.
+// Een emote kan ook een afbeelding zijn in plaats van een emoji: geef hem dan beeld:'<img src="emotes/…">'
+// mee (vierkant, ±256 px). De tekst blijft dan enkel als reserve.
 const EMOTES = [
   { id:'lach',    tekst:'😂', geluid:'geluid/emote-lach.mp3',  volume:1 },
   { id:'huil',    tekst:'😭', geluid:'geluid/emote-huil.mp3',  volume:0.8 },
@@ -2881,13 +2890,14 @@ function toggleEmoteKiezer(){
   if(el.style.display === 'block'){ el.style.display = 'none'; return; }
   // Elke keer opnieuw opgebouwd: tussen twee keer openen kan er een emote vrijgespeeld zijn.
   el.innerHTML = '';
-  const emoji = EMOTES.filter(e => !/[a-z]/i.test(e.tekst));
-  const zinnen = EMOTES.filter(e => /[a-z]/i.test(e.tekst));
+  const emoji = EMOTES.filter(e => e.beeld || !/[a-z]/i.test(e.tekst));
+  const zinnen = EMOTES.filter(e => !e.beeld && /[a-z]/i.test(e.tekst));
   const rooster = document.createElement('div'); rooster.className = 'emote-rooster';
   const lijst = document.createElement('div'); lijst.className = 'emote-zinnen';
   const knop = e => {
     const b = document.createElement('button');
-    b.textContent = e.tekst;
+    if(e.beeld){ b.innerHTML = e.beeld; b.classList.add('beeld'); }
+    else b.textContent = e.tekst;
     const beloning = bpBeloningVoorEmote(e.id);
     if(beloning && !isVrijgespeeld(beloning)){
       b.disabled = true;
@@ -2930,8 +2940,10 @@ function toonEmote(kleur, id){
   const plek = kleur === onderKleur ? 'emoteOnder' : 'emoteBoven';
   const el = document.getElementById(plek);
   if(!el) return;
-  el.textContent = emote.tekst;
-  el.classList.toggle('groot', !/[a-z]/i.test(emote.tekst));
+  if(emote.beeld) el.innerHTML = emote.beeld;
+  else el.textContent = emote.tekst;
+  el.classList.toggle('groot', !emote.beeld && !/[a-z]/i.test(emote.tekst));
+  el.classList.toggle('beeld', !!emote.beeld);
   el.classList.remove('zichtbaar');
   void el.offsetWidth;   // de animatie opnieuw laten starten als er al een ballonnetje stond
   el.classList.add('zichtbaar');
@@ -3196,7 +3208,8 @@ function bpNaam(b){
   if(b.soort === 'design') return skinById(b.id).naam;
   const e = EMOTES.find(x => x.id === b.id);
   if(!e) return b.id;
-  return b.soort === 'emote' ? `${e.tekst}-emote` : `“${e.tekst}”`;
+  if(b.soort === 'emote') return b.naam && e.beeld ? `${b.naam}-emote` : `${e.tekst}-emote`;
+  return `“${e.tekst}”`;
 }
 
 function bpVoorbeeld(b){
@@ -3205,8 +3218,8 @@ function bpVoorbeeld(b){
   const d = document.createElement('div');
   if(b.soort === 'emote'){
     // Tik op de emoji om het geluid te horen, ook als hij nog op slot is: dan weet je waarvoor je speelt.
-    d.className = 'bp-emoji';
-    d.textContent = e.tekst;
+    d.className = 'bp-emoji' + (e.beeld ? ' beeld' : '');
+    if(e.beeld) d.innerHTML = e.beeld; else d.textContent = e.tekst;
     d.title = 'Tik om te horen';
     d.onclick = () => speelEmoteGeluid(e);
   } else {
@@ -3250,15 +3263,17 @@ function renderBattlepass(){
   const xp = account && account.profiel ? account.profiel.xp : null;
   const spoor = document.createElement('div');
   spoor.className = 'bp-spoor';
-  const volgende = BATTLEPASS.find(b => tier < b.tier);
-  BATTLEPASS.forEach(b => {
-    const vrij = tier >= b.tier;
+  // Een tier kan meer dan één beloning hebben (tier 50): die staan dan onder elkaar naast één bolletje.
+  const tiers = [...new Set(BATTLEPASS.map(b => b.tier))];
+  const volgendeTier = tiers.find(t => tier < t);
+  tiers.forEach(stapTier => {
+    const vrij = tier >= stapTier;
     const stap = document.createElement('div');
-    stap.className = 'bp-stap ' + (vrij ? 'vrij' : b === volgende ? 'volgende' : 'dicht');
+    stap.className = 'bp-stap ' + (vrij ? 'vrij' : stapTier === volgendeTier ? 'volgende' : 'dicht');
 
     const rail = document.createElement('div');
     rail.className = 'bp-rail';
-    for(let t = b.tier - 4; t < b.tier; t++){
+    for(let t = stapTier - 4; t < stapTier; t++){
       const punt = document.createElement('div');
       punt.className = 'bp-punt' + (tier >= t ? ' aan' : '');
       punt.title = `Tier ${t}`;
@@ -3266,35 +3281,40 @@ function renderBattlepass(){
     }
     const bol = document.createElement('div');
     bol.className = 'bp-bol';
-    bol.textContent = b.tier;
+    bol.textContent = stapTier;
     rail.appendChild(bol);
 
-    const kaart = document.createElement('div');
-    kaart.className = 'bp-beloning';
-    const voorbeeld = document.createElement('div');
-    voorbeeld.className = 'bp-voorbeeld';
-    voorbeeld.appendChild(bpVoorbeeld(b));
-    if(!vrij) voorbeeld.insertAdjacentHTML('beforeend', '<span class="bp-slot">🔒</span>');
+    const kaarten = document.createElement('div');
+    kaarten.className = 'bp-kaarten';
+    BATTLEPASS.filter(b => b.tier === stapTier).forEach(b => {
+      const kaart = document.createElement('div');
+      kaart.className = 'bp-beloning';
+      const voorbeeld = document.createElement('div');
+      voorbeeld.className = 'bp-voorbeeld';
+      voorbeeld.appendChild(bpVoorbeeld(b));
+      if(!vrij) voorbeeld.insertAdjacentHTML('beforeend', '<span class="bp-slot">🔒</span>');
 
-    const info = document.createElement('div');
-    info.className = 'bp-info';
-    const soort = document.createElement('div');
-    soort.className = 'bp-soort';
-    soort.textContent = BP_SOORTNAAM[b.soort];
-    const naam = document.createElement('div');
-    naam.className = 'bp-naam';
-    naam.textContent = b.soort === 'design' ? skinById(b.id).naam : (b.naam || 'Plaagzinnetje');
-    const status = document.createElement('div');
-    status.className = 'bp-status';
-    status.textContent = vrij ? '✓ Vrijgespeeld'
-      : xp !== null ? `Nog ${account.tierVan(xp).xpTot(b.tier)} XP`
-      : `Tier ${b.tier}`;
-    info.appendChild(soort); info.appendChild(naam); info.appendChild(status);
+      const info = document.createElement('div');
+      info.className = 'bp-info';
+      const soort = document.createElement('div');
+      soort.className = 'bp-soort';
+      soort.textContent = BP_SOORTNAAM[b.soort];
+      const naam = document.createElement('div');
+      naam.className = 'bp-naam';
+      naam.textContent = b.soort === 'design' ? skinById(b.id).naam : (b.naam || 'Plaagzinnetje');
+      const status = document.createElement('div');
+      status.className = 'bp-status';
+      status.textContent = vrij ? '✓ Vrijgespeeld'
+        : xp !== null ? `Nog ${account.tierVan(xp).xpTot(b.tier)} XP`
+        : `Tier ${b.tier}`;
+      info.appendChild(soort); info.appendChild(naam); info.appendChild(status);
 
-    kaart.appendChild(voorbeeld);
-    kaart.appendChild(info);
+      kaart.appendChild(voorbeeld);
+      kaart.appendChild(info);
+      kaarten.appendChild(kaart);
+    });
     stap.appendChild(rail);
-    stap.appendChild(kaart);
+    stap.appendChild(kaarten);
     spoor.appendChild(stap);
   });
   el.appendChild(spoor);
