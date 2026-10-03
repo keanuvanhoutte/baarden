@@ -4473,13 +4473,25 @@ let waarderingNet = null, waarderingKapot = false;
 // js/meet_tegen_oude_ai.js).
 function waarderingAan(maxColor){ return WAARDERING_AAN && waarderingNet !== null; }
 
+// Geeft true zodra het netwerk er is. Een tweede aanroep (een meetopstelling, terwijl het spel het
+// al ophaalt) wacht op dezelfde lading in plaats van een tweede te starten of false te melden.
+let waarderingBelofte = null;
 function waarderingLaad(){
-  if(waarderingNet || !window.BaardenWaardering || !window.BaardenToestand) return Promise.resolve(false);
-  return fetch(WAARDERING_PAD)
-    .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(blob => { waarderingNet = BaardenWaardering.laad(blob); return true; })
-    .catch(err => { console.warn('Baarden: het waarderingsnetwerk laadde niet; de oude waardering blijft.', err); return false; });
+  if(waarderingNet) return Promise.resolve(true);
+  if(!window.BaardenWaardering || !window.BaardenToestand) return Promise.resolve(false);
+  if(!waarderingBelofte){
+    waarderingBelofte = fetch(WAARDERING_PAD)
+      .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(blob => { waarderingNet = BaardenWaardering.laad(blob); return true; })
+      .catch(err => { console.warn('Baarden: het waarderingsnetwerk laadde niet; de oude waardering blijft.', err); return false; });
+  }
+  return waarderingBelofte;
 }
+// Het netwerk zelf ophalen. Tot 3 oktober 2026 gebeurde dat alleen in rlLaad(), en dat draait alleen
+// als een trap `rlBot: true` heeft -- wat sinds 22 september nergens zo is. Het netwerk stond dus
+// aan (WAARDERING_AAN) maar werd nooit geladen, en elke trap speelde met de handgeschreven waardering.
+// Gevonden bij de herbouw (RL/resultaten/HERBOUW-LOG.md, "VONDST"). 162 KB, dus gewoon altijd laden.
+if(WAARDERING_AAN) waarderingLaad();
 
 const RL_NET_VERSIE = '20260916';
 const RL_NET_PAD = 'js/baarden_net.json?v=' + RL_NET_VERSIE;
@@ -4531,9 +4543,9 @@ function rlKlaar(){ return rlStatus === 'klaar' && window.BaardenBot && BaardenB
 //     bedenktijd: mediaan 15,5 ms op een pc (alleen), p99 ~115 ms, max ~200 ms
 // Python zei 79,3% +-2,2 (500 partijen). Zie RL/resultaten/HERBOUW-LOG.md.
 //
-// STAAT UIT tot dat besloten is. `var` en niet `let`: renderAiKeuze() kan lopen voor deze regel
-// bereikt is, en dan mag dit niet struikelen.
-var EENBOT_AAN = false;
+// Aan sinds 3 oktober 2026. `var` en niet `let`: renderAiKeuze() kan lopen voor deze regel bereikt
+// is, en dan mag dit niet struikelen. Op false zetten = trap 5 speelt weer als de oude Stefaan.
+var EENBOT_AAN = true;
 const EENBOT_OPTIES = { diepte: 4, werelden: 1, wortelmarge: 0.1, legpas: true, ordendiepte: 3 };
 var eenbotZoeker = null, eenbotStatus = 'ongeladen';
 // Zelfde ?v=-afspraak als WAARDERING_PAD: train ik opnieuw, dan verandert dit getal mee.
@@ -4547,6 +4559,9 @@ function eenbotLaad(){
     .then(blob => { eenbotZoeker = new EenBot.Zoeker(new EenBot.Netwerk(blob), EENBOT_OPTIES); eenbotStatus = 'klaar'; })
     .catch(err => { eenbotStatus = 'mislukt'; console.warn('Baarden: EenBot laadde niet; de oude AI speelt.', err); });
 }
+// Meteen bij het openen van de pagina, niet pas als iemand een trap kiest: de eerste beurt van de
+// bot kan anders net voor het netwerk binnen is vallen, en dan speelt hij die met de oude AI.
+if(EENBOT_AAN) eenbotLaad();
 
 // Alleen trap 5. Een meetopstelling vervangt deze functie om EenBot per kleur aan te zetten.
 function eenbotSpeelt(){ return EENBOT_AAN && eenbotStatus === 'klaar' && aiTegenstander().niveau === 5; }
