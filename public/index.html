@@ -5274,7 +5274,12 @@ function rlKlaar(){ return rlStatus === 'klaar' && window.BaardenBot && BaardenB
 // Het netwerk is na de herbouw verder getraind met zelfspel (RL/lus.py, reeks B, generatie 6:
 // 60% tegen zichzelf, 20% tegen een oudere generatie, 20% tegen deze Stefaan).
 //
-// GEMETEN IN DIT SPEL (js/meet_eenbot.js, diepte 4, 1 wereld, verse delingen):
+// Sinds 4 oktober (nacht): diepte 5 in de schuiffase (zie EENBOT_OPTIES). Gemeten tegen de
+// EenBot hieronder (diepte 4 overal), verse delingen: Python 65,4% +-2,2 (500 partijen),
+// browser 61,7% +-2,8 (300). Tegen Stefaan met netwerk: Python 87,3% +-2,2. Bedenktijd op
+// een stille pc, één pagina, tegen Stefaan: mediaan 42,6 ms (was 22,1), max ~0,5 s.
+//
+// DE VORIGE VERSIE (diepte 4 overal), js/meet_eenbot.js, verse delingen:
 //     EenBot tegen Stefaan met het waarderingsnetwerk   76,5% +-2,8   (300 partijen)
 //     EenBot tegen Stefaan zonder netwerk               74,3% +-3,5   (200 partijen)
 //     controle Stefaan tegen Stefaan                     50,0%
@@ -5284,7 +5289,11 @@ function rlKlaar(){ return rlStatus === 'klaar' && window.BaardenBot && BaardenB
 // Aan sinds 3 oktober 2026. `var` en niet `let`: renderAiKeuze() kan lopen voor deze regel bereikt
 // is, en dan mag dit niet struikelen. Op false zetten = trap 5 speelt weer als de oude Stefaan.
 var EENBOT_AAN = true;
-const EENBOT_OPTIES = { diepte: 4, werelden: 1, wortelmarge: 0.1, legpas: true, ordendiepte: 3 };
+// Diepte 5 in de schuiffase (daar levert diep zoeken het meest op en is het het goedkoopst),
+// diepte 4 in de legfase. Overschrijdt de diepe zoektocht 20 000 knopen, dan zoekt hij die zet
+// opnieuw op diepte 4: zo blijven er geen uitschieters van seconden. Zie HERBOUW-LOG, "Nacht".
+const EENBOT_OPTIES = { diepte: 4, schuifdiepte: 5, knoopgrens: 20000, werelden: 1,
+                        wortelmarge: 0.1, legpas: true, ordendiepte: 4, snelschud: true };
 var eenbotZoeker = null, eenbotStatus = 'ongeladen';
 // Zelfde ?v=-afspraak als WAARDERING_PAD: train ik opnieuw, dan verandert dit getal mee.
 const EENBOT_NET_PAD = 'js/eenbot_net.json?v=20261003';

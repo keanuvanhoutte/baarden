@@ -160,6 +160,25 @@
     new PyRandom(this.zaad * 1000003 + stapel.length).shuffle(stapel);
   };
 
+  // Snellere variant (optie `snelschud`): dezelfde eigenschap -- zelfde stapel, zelfde volgorde
+  // binnen een wereld -- maar zonder telkens een Mersenne Twister op te bouwen (21% van de
+  // rekentijd op diepte 5). mulberry32, bit voor bit gelijk aan _SnelSchudder in RL/eenbot.py.
+  const SUIT_IDX = { H: 0, D: 1, S: 2, C: 3 };
+  function SnelSchudder(zaad) { this.zaad = zaad; }
+  SnelSchudder.prototype.shuffle = function (stapel) {
+    stapel.sort((a, b) => (RANK_IDX[a.rank] * 4 + SUIT_IDX[a.suit]) - (RANK_IDX[b.rank] * 4 + SUIT_IDX[b.suit]));
+    let a = (this.zaad * 1000003 + stapel.length) % 4294967296;
+    for (let i = stapel.length - 1; i > 0; i--) {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      const r = (t ^ (t >>> 14)) >>> 0;
+      const j = r % (i + 1);
+      const x = stapel[i]; stapel[i] = stapel[j]; stapel[j] = x;
+    }
+  };
+
   // ------------------------------------------------------------------ spel
   function Game() {}
 
@@ -696,6 +715,17 @@
     this.wortelmarge = opties.wortelmarge !== undefined ? opties.wortelmarge : null;
     this.legbreedte = opties.legbreedte !== undefined ? opties.legbreedte : null;
     this.legpas = !!opties.legpas;
+    this.snelschud = !!opties.snelschud;
+    // Zoeken onder een knopenlimiet: eerst op de volle diepte met hoogstens `knoopgrens`
+    // knopen; wordt die overschreden, dan opnieuw (zonder limiet) op diepte-1. Zo zoekt hij
+    // diep waar het betaalbaar is, zonder uitschieters van seconden. Deterministisch:
+    // dezelfde stelling geeft dezelfde knopentelling, in JS en in Python.
+    this.knoopgrens = opties.knoopgrens ? opties.knoopgrens : null;
+    // Diepte voor een beslissing in de schuiffase (de wortel staat in MOVE); de legfase houdt
+    // `diepte`. In de schuiffase is diep zoeken het meest waard en het goedkoopst.
+    this.schuifdiepte = opties.schuifdiepte ? opties.schuifdiepte : null;
+    this._grens = Infinity;
+    this.diepGelukt = 0; this.diepAfgebroken = 0;
     this.wortelRonde = 0;
     this.geschiedenis = new Float64Array(N_ACTIONS);
     this.knopen = 0; this.bladen = 0;
@@ -733,8 +763,10 @@
     k.sort(maxi ? (x, y) => y[0] - x[0] : (x, y) => x[0] - y[0]);
     return k;
   };
+  const AFBREKEN = { afbreken: true };
   Zoeker.prototype.zoek = function (g, diepte, alfa, beta, afstand) {
     this.knopen++;
+    if (this.knopen > this._grens) throw AFBREKEN;
     if (g.gameOver) return this.eind(g, afstand);
     if (diepte <= 0) return this.blad(g);
     const legaal = g.legalActions();
@@ -780,7 +812,7 @@
     let volgorde = legaal.slice();
     for (let k = 0; k < this.werelden; k++) {
       const wereld = determiniseer(game, kleur, new PyRandom(basis + k * 15485863));
-      wereld.rng = new Schudder(basis + k);
+      wereld.rng = this.snelschud ? new SnelSchudder(basis + k) : new Schudder(basis + k);
       let reeks;
       if (k === 0) reeks = this.kinderen(wereld, legaal, true, 0).map(t => [t[1], t[2]]);
       else {
@@ -807,13 +839,31 @@
     if (!legaal.length) return null;
     if (legaal.length === 1) return legaal[0];
     this.geschiedenis.fill(0);
-    const w = this.waarden(game, legaal);
-    let best = null, bw = -Infinity;
-    for (const a of legaal) {           // oplopend: bij gelijke waarde de laagste index
-      const x = w.get(a);
-      if (x > bw) { bw = x; best = a; }
-    }
-    return best;
+    const beste = w => {
+      let best = null, bw = -Infinity;
+      for (const a of legaal) {         // oplopend: bij gelijke waarde de laagste index
+        const x = w.get(a);
+        if (x > bw) { bw = x; best = a; }
+      }
+      return best;
+    };
+    const basis = this.diepte;
+    const D = (this.schuifdiepte !== null && game.phase === MOVE) ? this.schuifdiepte : basis;
+    try {
+      this.diepte = D;
+      if (this.knoopgrens === null) return beste(this.waarden(game, legaal));
+      this._grens = this.knopen + this.knoopgrens;
+      try {
+        const keuze = beste(this.waarden(game, legaal));
+        this.diepGelukt++;
+        return keuze;
+      } catch (e) {
+        if (e !== AFBREKEN) throw e;
+        this.diepAfgebroken++;
+      } finally { this._grens = Infinity; }
+      this.diepte = D - 1;
+      return beste(this.waarden(game, legaal));
+    } finally { this.diepte = basis; }
   };
 
   // Een nieuwe partij, exact zoals BaardenGame(maxRounds, rng=random.Random(zaad)).
@@ -910,7 +960,7 @@
   }
 
   const api = {
-    Game, Piece, Card, PyRandom, Schudder, Netwerk, Zoeker, vector, determiniseer,
+    Game, Piece, Card, PyRandom, Schudder, SnelSchudder, Netwerk, Zoeker, vector, determiniseer,
     verborgenVoorraad, evaluateOnBoard, vanPython, vanBrowser, buildColorDeck, nieuwSpel,
     ALL_CELLS, CELL_IDX, MIRROR, NBD, TERR, RANKS, RANK_VALUE, RANK_IDX,
     A_MOVE, A_PLACE_HAND, A_HAND_TO_HOLD, A_HOLD_TO_FIELD, A_TOWER_BUILD, A_BLOCK, A_PASS,
