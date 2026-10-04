@@ -123,6 +123,23 @@
   #lobby.sub .waaier-kaart .hoek{ left:7px; top:5px; font-size:15px; }
   #lobby.sub .waaier-kaart .midden{ font-size:38px; }
   #lobby.sub .menu-name{ font-size:40px; margin-top:16px; }
+  /* Tegen AI is het langste scherm waarop je een spel start. Zonder waaier past het zonder scrollen,
+     en dat moet: wie scrolt en dan op Spelen tikt, begint het spel half naar beneden geschoven, met
+     de adresbalk weg -- en dan trek je makkelijk per ongeluk de pagina opnieuw. */
+  #lobby[data-paneel="ai"] .menu-waaier{ display:none; }
+  #lobby[data-paneel="ai"] .menu-name{ margin-top:6px; font-size:34px; }
+  #lobby[data-paneel="ai"] .account-balk.ingelogd{ margin-top:2px; }
+  #lobby[data-paneel="ai"] .menu-subpanel{ margin:12px 0 0 0; padding:12px; }
+  #aiPanel .subpanel-title{ font-size:19px; margin-bottom:10px; padding-bottom:8px; }
+  #aiPanel .ai-label{ margin:10px 0 6px 0; }
+  #aiPanel .ai-kleurknop{ padding:9px 6px; }
+  #aiPanel .ai-label.eerste{ margin-top:0; }
+  #aiPanel .ai-tegenstander-kaart{ margin-top:8px; padding:10px 12px 10px; }
+  #aiPanel .ai-avatar{ width:64px; height:64px; border-width:3px; }
+  #aiPanel .ai-naam{ margin-top:6px; }
+  #aiPanel .ai-uitleg{ margin-top:6px; line-height:1.4; }
+  #aiPanel .subpanel-primary{ margin-top:12px; padding:14px; }
+  #lobby #aiPanel button.secondary.subpanel-back{ margin-top:10px; padding:11px 16px; }
   #lobby.sub .account-balk:not(.ingelogd){ display:none; }
   #lobby .account-balk{ margin:22px 0 0 0; }
   #menuButtons, .menu-subpanel{ margin-top:22px; }
@@ -2654,6 +2671,7 @@ async function joinRoom(){
 
   document.getElementById('lobbyWrap').style.display='none';
   document.getElementById('gamePanel').style.display='block';
+  naarBoven();
   document.getElementById('settingsControls').style.display='block';
   showConnectionStatus(true);
   startPolling();
@@ -2665,13 +2683,20 @@ async function joinRoom(){
 // de hoofdknoppen. Elk subpaneel heeft daarvoor zelf een "← Terug"-knop.
 const MENU_PANELS = { multiplayer:'multiplayerPanel', solo:'soloPanel', ai:'aiPanel', skins:'skinPanel', battlepass:'battlepassPanel' };
 
+// Terug naar de bovenkant van de pagina. Op een telefoon komt daarmee ook de adresbalk terug, en
+// begint een nieuw scherm niet half naar beneden geschoven omdat je op het vorige gescrold had.
+function naarBoven(){ window.scrollTo(0, 0); }
+
 function openMenuPanel(name){
   Object.values(MENU_PANELS).forEach(id => {
     const el = document.getElementById(id);
     if(el) el.style.display = 'none';
   });
   document.getElementById('menuButtons').style.display = name ? 'none' : 'block';
-  document.getElementById('lobby').classList.toggle('sub', !!name);   // kleinere kaartwaaier bovenaan
+  const lobby = document.getElementById('lobby');
+  lobby.classList.toggle('sub', !!name);   // kleinere kaartwaaier bovenaan
+  lobby.dataset.paneel = name || '';
+  naarBoven();
   if(name && MENU_PANELS[name]) document.getElementById(MENU_PANELS[name]).style.display = 'block';
   if(name !== 'multiplayer') document.getElementById('lobbyMsg').textContent = '';
   if(name === 'skins') renderSkinLijst();
@@ -2794,6 +2819,7 @@ function startSolo(){
   state.players.black = true;
   document.getElementById('lobbyWrap').style.display='none';
   document.getElementById('gamePanel').style.display='block';
+  naarBoven();
   document.getElementById('settingsControls').style.display='block';
   renderAll();
 }
@@ -2931,6 +2957,7 @@ function startVsAI(){
   state.players.black = true;
   document.getElementById('lobbyWrap').style.display='none';
   document.getElementById('gamePanel').style.display='block';
+  naarBoven();
   document.getElementById('settingsControls').style.display='block';
   renderAll();
 }
