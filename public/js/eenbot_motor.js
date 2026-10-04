@@ -724,6 +724,25 @@
     // Diepte voor een beslissing in de schuiffase (de wortel staat in MOVE); de legfase houdt
     // `diepte`. In de schuiffase is diep zoeken het meest waard en het goedkoopst.
     this.schuifdiepte = opties.schuifdiepte ? opties.schuifdiepte : null;
+    // Zetvolgorde (weg 1, alleen JS; veranderen de exacte waarden niet, alleen hoeveel er
+    // gezocht wordt): killer-zetten per afstand, zoeken met een smal venster (PVS), en een
+    // zettabel met de beste zet per stelling uit eerdere iteraties.
+    this.killers = !!opties.killers;
+    this.pvs = !!opties.pvs;
+    this.zettabel = !!opties.zettabel;
+    // iteratief: eerst diepte-1 volledig (vult de zettabel en is de terugval), dan diepte
+    // met de knoopgrens. Zonder: eerst diepte met grens, bij overschrijding diepte-1.
+    this.iteratief = !!opties.iteratief;
+    this._killer = [];
+    this._tabel = new Map();
+    // Transpositietabel (alleen JS, optie `tt`): per wereld, per beslissing. Sleutel = het
+    // bord + aan zet + fase (g.sleutel) plus alles buiten het bord wat de rest van de boom
+    // kan veranderen. Niet in de sleutel: de herhalingsgeschiedenis van het pad -- de
+    // gebruikelijke benadering (dezelfde stelling via een andere weg telt hetzelfde).
+    this.tt = !!opties.tt;
+    this.ttBlad = !!opties.ttBlad;
+    this._tt = new Map();
+    this.ttTreffers = 0;
     this._grens = Infinity;
     this.diepGelukt = 0; this.diepAfgebroken = 0;
     this.wortelRonde = 0;
@@ -745,10 +764,15 @@
     const w = WINST - 0.001 * afstand;
     return g.winner === this.wortel ? w : -w;
   };
-  Zoeker.prototype.orden = function (legaal) {
+  Zoeker.prototype.orden = function (legaal, afstand) {
     const h = this.geschiedenis;
-    return legaal.slice().sort((a, b) =>
-      (h[b] + (b === A_TOWER_BUILD ? 1e9 : 0)) - (h[a] + (a === A_TOWER_BUILD ? 1e9 : 0)));
+    if (!this.killers || afstand === undefined) {
+      return legaal.slice().sort((a, b) =>
+        (h[b] + (b === A_TOWER_BUILD ? 1e9 : 0)) - (h[a] + (a === A_TOWER_BUILD ? 1e9 : 0)));
+    }
+    const k = this._killer[afstand] || [-1, -1];
+    const sc = a => h[a] + (a === A_TOWER_BUILD ? 1e9 : 0) + (a === k[0] ? 5e8 : 0) + (a === k[1] ? 4e8 : 0);
+    return legaal.slice().sort((a, b) => sc(b) - sc(a));
   };
   Zoeker.prototype.kinderen = function (g, legaal, maxi, afstand) {
     const k = [];
@@ -764,11 +788,49 @@
     return k;
   };
   const AFBREKEN = { afbreken: true };
+  const C = c => c.rank + c.suit;
+  function ttSleutel(g) {
+    if (g.sleutel === null) return null;
+    const h = g.hold;
+    return g.sleutel + '|' + g.roundNumber + g.starter[0]
+      + (g.acted.red ? 1 : 0) + (g.acted.black ? 1 : 0)
+      + (g.towerReset.red ? 1 : 0) + (g.towerReset.black ? 1 : 0)
+      + (g.blockReserve.red ? 1 : 0) + (g.blockReserve.black ? 1 : 0)
+      + '|' + (h.red ? C(h.red) : '-') + (h.black ? C(h.black) : '-')
+      + '|' + g.hand.red.map(C).join('') + '/' + g.hand.black.map(C).join('')
+      + '|' + g.drawPile.red.length + ',' + g.drawPile.black.length + ','
+      + g.discard.red.length + ',' + g.discard.black.length + ','
+      + g.fallen.red.length + ',' + g.fallen.black.length + ','
+      + g.destroyed.red.length + ',' + g.destroyed.black.length
+      + '|' + (g.pendingRevive || '') + g.buildCandidates.length;
+  }
+  const EXACT = 0, ONDER = 1, BOVEN = 2;
   Zoeker.prototype.zoek = function (g, diepte, alfa, beta, afstand) {
     this.knopen++;
     if (this.knopen > this._grens) throw AFBREKEN;
     if (g.gameOver) return this.eind(g, afstand);
-    if (diepte <= 0) return this.blad(g);
+    if (diepte <= 0) {
+      if (!this.ttBlad) return this.blad(g);
+      // Bladwaarden zijn exact; dezelfde stelling hoeft maar één keer door het netwerk.
+      const bk = ttSleutel(g);
+      if (bk === null) return this.blad(g);
+      const e = this._tt.get(bk);
+      if (e !== undefined && e.d >= 0 && e.f === EXACT) { this.ttTreffers++; return e.v; }
+      const v = this.blad(g);
+      if (e === undefined) this._tt.set(bk, { d: 0, v: v, f: EXACT, a: -1 });
+      return v;
+    }
+    let ttk = null, tte;
+    if (this.tt) {
+      ttk = ttSleutel(g);
+      if (ttk !== null && (tte = this._tt.get(ttk)) !== undefined && tte.d >= diepte) {
+        if (tte.f === EXACT || (tte.f === ONDER && tte.v >= beta) || (tte.f === BOVEN && tte.v <= alfa)) {
+          this.ttTreffers++;
+          return tte.v;
+        }
+      }
+    }
+    const alfa0 = alfa, beta0 = beta;
     const legaal = g.legalActions();
     if (!legaal.length) return this.blad(g);
     const kosten = this.kosten(g);
@@ -786,16 +848,57 @@
     } else if (diepte >= this.ordendiepte && legaal.length > 2) {
       reeks = this.kinderen(g, legaal, maxi, afstand);
     } else {
-      reeks = this.orden(legaal).map(a => [0, a, null]);
+      reeks = this.orden(legaal, afstand).map(a => [0, a, null]);
     }
+    if (tte !== undefined && tte.a >= 0) {
+      const i = reeks.findIndex(x => x[1] === tte.a);
+      if (i > 0) { const x = reeks[i]; reeks.splice(i, 1); reeks.unshift(x); }
+    }
+    const sl = this.zettabel ? g.sleutel : null;
+    if (sl !== null) {
+      const hint = this._tabel.get(sl + '#' + afstand);
+      if (hint !== undefined) {
+        const i = reeks.findIndex(x => x[1] === hint);
+        if (i > 0) { const x = reeks[i]; reeks.splice(i, 1); reeks.unshift(x); }
+      }
+    }
+    const EPS = 1e-9;
+    let besteA = -1, eerste = true;
     for (const item of reeks) {
       const a = item[1];
       let kind = item[2];
       if (kind === null) { kind = g.clone(); kind.step(a, false); }
-      const v = this.zoek(kind, diepte - kosten, alfa, beta, afstand + 1);
-      if (maxi) { if (v > beste) beste = v; if (v > alfa) alfa = v; }
-      else { if (v < beste) beste = v; if (v < beta) beta = v; }
-      if (beta <= alfa) { this.geschiedenis[a] += diepte * diepte; break; }
+      let v;
+      if (this.pvs && !eerste && beta - alfa > EPS) {
+        // smal venster: is deze zet beter dan de beste tot nu toe? Zo ja, opnieuw met het
+        // volle venster, zodat de waarde exact blijft.
+        if (maxi) {
+          v = this.zoek(kind, diepte - kosten, alfa, alfa + EPS, afstand + 1);
+          if (v > alfa && v < beta) v = this.zoek(kind, diepte - kosten, alfa, beta, afstand + 1);
+        } else {
+          v = this.zoek(kind, diepte - kosten, beta - EPS, beta, afstand + 1);
+          if (v < beta && v > alfa) v = this.zoek(kind, diepte - kosten, alfa, beta, afstand + 1);
+        }
+      } else {
+        v = this.zoek(kind, diepte - kosten, alfa, beta, afstand + 1);
+      }
+      eerste = false;
+      if (maxi) { if (v > beste) { beste = v; besteA = a; } if (v > alfa) alfa = v; }
+      else { if (v < beste) { beste = v; besteA = a; } if (v < beta) beta = v; }
+      if (beta <= alfa) {
+        this.geschiedenis[a] += diepte * diepte;
+        if (this.killers) {
+          const k = this._killer[afstand] || (this._killer[afstand] = [-1, -1]);
+          if (k[0] !== a) { k[1] = k[0]; k[0] = a; }
+        }
+        break;
+      }
+    }
+    if (sl !== null && besteA >= 0) this._tabel.set(sl + '#' + afstand, besteA);
+    // Winstwaarden niet opslaan: die hangen van de afstand tot de wortel af.
+    if (ttk !== null && Math.abs(beste) < 1.5) {
+      const f = beste <= alfa0 ? BOVEN : (beste >= beta0 ? ONDER : EXACT);
+      if (tte === undefined || tte.d <= diepte) this._tt.set(ttk, { d: diepte, v: beste, f: f, a: besteA });
     }
     return beste;
   };
@@ -811,6 +914,7 @@
     for (const a of legaal) som.set(a, 0);
     let volgorde = legaal.slice();
     for (let k = 0; k < this.werelden; k++) {
+      this._tt.clear();
       const wereld = determiniseer(game, kleur, new PyRandom(basis + k * 15485863));
       wereld.rng = this.snelschud ? new SnelSchudder(basis + k) : new Schudder(basis + k);
       let reeks;
@@ -839,6 +943,8 @@
     if (!legaal.length) return null;
     if (legaal.length === 1) return legaal[0];
     this.geschiedenis.fill(0);
+    this._killer = [];
+    this._tabel.clear();
     const beste = w => {
       let best = null, bw = -Infinity;
       for (const a of legaal) {         // oplopend: bij gelijke waarde de laagste index
@@ -852,6 +958,12 @@
     try {
       this.diepte = D;
       if (this.knoopgrens === null) return beste(this.waarden(game, legaal));
+      let terugval = null;
+      if (this.iteratief) {
+        this.diepte = D - 1;
+        terugval = beste(this.waarden(game, legaal));
+        this.diepte = D;
+      }
       this._grens = this.knopen + this.knoopgrens;
       try {
         const keuze = beste(this.waarden(game, legaal));
@@ -861,6 +973,7 @@
         if (e !== AFBREKEN) throw e;
         this.diepAfgebroken++;
       } finally { this._grens = Infinity; }
+      if (terugval !== null) return terugval;
       this.diepte = D - 1;
       return beste(this.waarden(game, legaal));
     } finally { this.diepte = basis; }

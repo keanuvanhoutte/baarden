@@ -5319,8 +5319,11 @@ var EENBOT_AAN = true;
 // Diepte 5 in de schuiffase (daar levert diep zoeken het meest op en is het het goedkoopst),
 // diepte 4 in de legfase. Overschrijdt de diepe zoektocht 20 000 knopen, dan zoekt hij die zet
 // opnieuw op diepte 4: zo blijven er geen uitschieters van seconden. Zie HERBOUW-LOG, "Nacht".
-const EENBOT_OPTIES = { diepte: 4, schuifdiepte: 5, knoopgrens: 20000, werelden: 1,
-                        wortelmarge: 0.1, legpas: true, ordendiepte: 4, snelschud: true };
+// Kandidaat I (nog niet live): diepte 6 in de schuiffase, betaalbaar dankzij een
+// transpositietabel (tt) en killer-zetten. Zie HERBOUW-LOG, "Weg 1".
+const EENBOT_OPTIES = { diepte: 4, schuifdiepte: 6, knoopgrens: 40000, werelden: 1,
+                        wortelmarge: 0.1, legpas: true, ordendiepte: 5, snelschud: true,
+                        tt: true, killers: true };
 var eenbotZoeker = null, eenbotStatus = 'ongeladen';
 // Zelfde ?v=-afspraak als WAARDERING_PAD: train ik opnieuw, dan verandert dit getal mee.
 const EENBOT_NET_PAD = 'js/eenbot_net.json?v=20261003';
