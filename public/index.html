@@ -2867,9 +2867,10 @@ function zetNiveauKleuren(el, tegenstander){
 // gewisseld=true laat het mannetje even opveren, zodat je merkt dat er een ander tegenover je zit.
 function renderAiKeuze(gewisseld){
   if(!aiKeuze) aiKeuze = laadAiKeuze();
-  // Het netwerk is bijna twee megabyte. Dat halen we alleen binnen als de gekozen trap er ook echt
-  // mee speelt; wie Robert of Stefaan kiest, hoort niets te downloaden. Deze functie draait bij elke
-  // verschuiving van de slider, dus zodra iemand naar zo'n trap gaat begint het laden alsnog op tijd.
+  // Het RL-netwerk (rlBot) is bijna twee megabyte. Dat halen we alleen binnen als een trap er ook echt
+  // mee speelt -- nu geen enkele. Deze functie draait bij elke verschuiving van de slider, dus zodra
+  // zo'n trap er komt, begint het laden alsnog op tijd. Het EenBot-netwerk (166 KB) laadt al bij het
+  // openen van de pagina; de oproep hieronder is een vangnet en doet dan niets.
   if(AI_TEGENSTANDERS.some(o=>o.rlBot)) rlLaad();
   if(EENBOT_AAN) eenbotLaad();
   const paneel = document.getElementById('aiPanel');
