@@ -5374,6 +5374,7 @@ async function eenbotBeurt(){
     const legaal = g.legalActions();
     if(!legaal.length) return false;
     const actie = eenbotZoekerNu().kies(g, legaal);
+    await aiWachtDenkpauze();
     if(!await rlVoerUit(BaardenActies.decodeer(actie, aiColor), aiColor)) return false;
     if(!state || state.winner || state.turn !== aiColor) return true;
     if(!state.towerBuild && !state.reviveChoice) return true;
@@ -5631,6 +5632,7 @@ async function aiDoPlacePhase(){
   const color = aiColor;
   const chain = state.towerResetThisRound[color] ? [] : computeTowerChain(color,'place');
   if(chain.length>0 && chainIncludesHand(chain) && !towerUpgradeExposesTower(state.board, color, chain)){
+    await aiWachtDenkpauze();
     await startTowerBuild('place');
     return;
   }
@@ -5659,6 +5661,7 @@ async function aiDoPlacePhase(){
     state.hand[color].forEach((card, idx)=> freeCells.forEach(cell=> opties.push({soort:'veld', idx, cell})));
     best = willekeurigUit(opties);
   }
+  await aiWachtDenkpauze();
   if(best.soort==='pas'){ await passPlace(); return; }
   state.selected = {idx:best.idx, card:state.hand[color][best.idx]};
   if(best.soort==='hold') await placeInHold();
@@ -5672,6 +5675,7 @@ async function aiDoMovePhase(){
   // Niet opwaarderen als de toren daarna te nemen is (zie towerUpgradeExposesTower). Dan eerst die
   // kaart blokkeren of wegslaan; de waardering straft een vrije Aas naast een toren van 2 daar ook voor.
   if(chain.length>0 && !threatened && !towerUpgradeExposesTower(state.board, color, chain)){
+    await aiWachtDenkpauze();
     await startTowerBuild('move');
     return;
   }
@@ -5689,6 +5693,7 @@ async function aiDoMovePhase(){
   } finally {
     waarderingCache = null;
   }
+  await aiWachtDenkpauze();
 
   // Bevestigd: vergelijk de blok-kaart als volwaardig alternatief t.o.v. de beste gewone zet,
   // i.p.v. hem enkel als noodgreep te gebruiken wanneer er toevallig geen andere zet meer is.
@@ -5779,9 +5784,11 @@ async function aiResolvePendingChoices(){
   const color = aiColor;
   for(let stap=0; stap<20 && state && !state.winner && state.turn===color; stap++){
     if(state.reviveChoice && state.reviveChoice.color===color){
+      await aiWachtDenkpauze();
       await sleep(350);
       await chooseRevive(aiPickReviveCard(color));
     } else if(state.towerBuild && state.towerBuild.pendingCandidates){
+      await aiWachtDenkpauze();
       await sleep(350);
       await chooseTowerCandidate(aiPickTowerCandidate(color));
     } else {
@@ -5795,9 +5802,22 @@ async function aiResolvePendingChoices(){
 // precies zoals vroeger, en merkt de speler niets van de storing.
 async function aiOudeBeurt(){
   if(state.towerBuild || state.reviveChoice){ await aiResolvePendingChoices(); }
-  else if(state.phase==='draw'){ await doDrawBoth(); }
+  else if(state.phase==='draw'){ await aiWachtDenkpauze(); await doDrawBoth(); }
   else if(state.phase==='place'){ await aiDoPlacePhase(); await aiResolvePendingChoices(); }
   else if(state.phase==='move'){ await aiDoMovePhase(); await aiResolvePendingChoices(); }
+}
+
+// De denkpauze: een zet van de AI komt nooit vroeger dan AI_DENKPAUZE ms na het begin van zijn beurt,
+// zodat hij volgbaar blijft. Het rekenen gebeurt BINNEN die pauze: eerst één beeld laten tekenen (de
+// zet van de speler staat dan op het scherm), dan rekenen, en pas vlak voor de eerste zichtbare
+// handeling de rest van de pauze uitzitten (aiWachtDenkpauze). Vroeger kwam het rekenen er nog
+// bovenop: 500 ms + bedenktijd.
+const AI_DENKPAUZE = 500;
+let aiDenkpauzeEinde = 0;
+async function aiWachtDenkpauze(){
+  const rest = aiDenkpauzeEinde - performance.now();
+  aiDenkpauzeEinde = 0;
+  if(rest > 0) await sleep(rest);
 }
 
 async function aiTakeTurn(){
@@ -5805,18 +5825,20 @@ async function aiTakeTurn(){
   aiThinking = true;
   bypassTurnGate = true;
   try{
-    await sleep(500); // korte "denkpauze" zodat de zet van de AI volgbaar blijft
+    aiDenkpauzeEinde = performance.now() + AI_DENKPAUZE;
+    await sleep(50); // één beeld, zodat de zet van de speler al getekend is voor het rekenen begint
     rlBewaakVoortgang();
     // Veiligheidsklep. Een toren-opbouw die gestart is maar geen openstaande keuze meer heeft, hangt:
     // elke functie in de legfase weigert zolang state.towerBuild bestaat, dus het bord zou stilvallen.
     // Dit trof beide bots even hard -- ook de oude, die op zo'n stand net zo goed niets meer doet.
     // advanceTowerBuild() duwt de opbouw alsnog naar zijn einde.
     if(state.towerBuild && !state.towerBuild.pendingCandidates && !state.reviveChoice){
+      await aiWachtDenkpauze();
       await advanceTowerBuild();
       if(!state || state.winner || state.turn !== aiColor) return;
     }
     // Kaarten trekken is geen keuze en hoort bij het spel, niet bij de bot.
-    if(state.phase==='draw' && !state.towerBuild && !state.reviveChoice){ await doDrawBoth(); }
+    if(state.phase==='draw' && !state.towerBuild && !state.reviveChoice){ await aiWachtDenkpauze(); await doDrawBoth(); }
     // Alleen een trap die daar uitdrukkelijk op staat (`rlBot: true`) speelt met het getrainde
     // netwerk. Staat dat nergens aan, dan is dit gewoon de oude zoeker -- de bot die het spel altijd
     // gespeeld heeft. Lukt het netwerk niet, dan neemt de zoeker de partij over op precies het niveau
@@ -5829,7 +5851,7 @@ async function aiTakeTurn(){
       catch(err){ console.warn('Baarden: EenBot viel uit; de oude AI neemt de beurt over.', err); }
       if(!gelukt && state && !state.winner && state.turn === aiColor) await aiOudeBeurt();
     }
-    else if(aiTegenstander().rlBot && rlKlaar()){ if(!await rlBeurt()) await aiOudeBeurt(); }
+    else if(aiTegenstander().rlBot && rlKlaar()){ await aiWachtDenkpauze(); if(!await rlBeurt()) await aiOudeBeurt(); }
     else { await aiOudeBeurt(); }
   } finally {
     bypassTurnGate = false;
