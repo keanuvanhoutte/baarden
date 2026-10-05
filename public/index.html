@@ -5301,17 +5301,12 @@ function rlKlaar(){ return rlStatus === 'klaar' && window.BaardenBot && BaardenB
 // Het netwerk is na de herbouw verder getraind met zelfspel (RL/lus.py, reeks B, generatie 6:
 // 60% tegen zichzelf, 20% tegen een oudere generatie, 20% tegen deze Stefaan).
 //
-// Sinds 4 oktober (nacht): diepte 5 in de schuiffase (zie EENBOT_OPTIES). Gemeten tegen de
-// EenBot hieronder (diepte 4 overal), verse delingen: Python 65,4% +-2,2 (500 partijen),
-// browser 61,7% +-2,8 (300). Tegen Stefaan met netwerk: Python 87,3% +-2,2. Bedenktijd op
-// een stille pc, één pagina, tegen Stefaan: mediaan 42,6 ms (was 22,1), max ~0,5 s.
-//
-// DE VORIGE VERSIE (diepte 4 overal), js/meet_eenbot.js, verse delingen:
-//     EenBot tegen Stefaan met het waarderingsnetwerk   76,5% +-2,8   (300 partijen)
-//     EenBot tegen Stefaan zonder netwerk               74,3% +-3,5   (200 partijen)
-//     controle Stefaan tegen Stefaan                     50,0%
-//     bedenktijd: mediaan 15,5 ms op een pc (alleen), p99 ~115 ms, max ~200 ms
-// Python zei 79,3% +-2,2 (500 partijen). Zie RL/resultaten/HERBOUW-LOG.md.
+// De versies tot nu toe (alle cijfers op verse delingen; RL/resultaten/HERBOUW-LOG.md):
+//   3 okt   diepte 4 overal: 76,5% +-2,8 tegen de oude Stefaan met netwerk (browser, 300).
+//   4 okt   H, diepte 5 in de schuiffase: 61,7% +-2,8 tegen die van 3 okt (browser, 300).
+//   5 okt   I, diepte 6 in de schuiffase + tabel: 57,5% +-2,0 tegen H (browser, 600); 88,0% tegen de
+//           oude Stefaan (Python, 500). Dat is de versie hieronder (EENBOT_OPTIES).
+//   Diepte 7 (J) haalde 54,1% tegen I en ging niet live: elke zet dieper levert steeds minder op.
 //
 // Aan sinds 3 oktober 2026. `var` en niet `let`: renderAiKeuze() kan lopen voor deze regel bereikt
 // is, en dan mag dit niet struikelen. Op false zetten = trap 5 speelt weer als de oude Stefaan.
