@@ -4415,17 +4415,28 @@ const BLADCACHE_AAN = true;
 const AI_SEARCH_DEPTH = 4; // aantal zetten (plies) vooruitkijken tijdens de bewegingsfase, op volle sterkte
 
 /* ---------- Moeilijkheid: vijf tegenstanders ---------- */
-// Tegen AI kies je een tegenstander. `diepte` is hoe ver hij vooruitkijkt, `foutkans` hoe vaak hij met
-// opzet iets willekeurigs doet. Dat is de ladder zoals hij altijd gespeeld heeft, en zoals hij sinds
-// 18-09 weer speelt.
+// Tegen AI kies je een tegenstander. `diepte` is hoe ver de oude AI vooruitkijkt, `foutkans` hoe vaak hij
+// met opzet iets willekeurigs doet. Een trap met `eenbot` speelt in plaats daarvan EenBot met die
+// instellingen (`true` = EENBOT_OPTIES); diepte en foutkans zijn dan alleen de terugval als EenBot niet
+// laadt.
+//
+// DE LADDER SINDS 6 OKTOBER: ongeveer gelijke stappen, en een grotere sprong naar Stefaan. Gemeten in het
+// spel zelf (js/meet_ladder.js, het echte pad van het spel, verse delingen, 200 partijen per paar,
+// beide kleuren), de sterkere trap wint:
+//     George - Bob 73,3%   Robert - George 75,0%   Ferdinand - Robert 67,0%   Stefaan - Ferdinand 80,8%
+// (+-3,5 elk; RL/resultaten/herbouw/ladder.txt).
+// Robert is de Stefaan van voor EenBot (oude AI, diepte 4, geen foutkans). Wat er hiervoor stond:
+// Bob d1/35%, George d2/20%, Robert d3/10%, Ferdinand d4/5%, Stefaan d4/0%; gemeten met netwerk was dat
+// George - Bob 87,0%, Robert - George 71,3%, Ferdinand - Robert 66,5%, oude Stefaan - Ferdinand 63,0%,
+// en daarna EenBot - oude Stefaan 89,3%: een gat bovenaan.
 //
 // WAT HIER OP 16-09 STOND, EN WAAROM HET WEG IS. Toen zat achter alle vijf de trappen de getrainde
 // RL-bot met `temperatuur` als enige knop. Dat is teruggedraaid nadat gemeten werd hoe sterk die bot
 // werkelijk is: tegen deze AI op volle sterkte haalt hij rond de 20%. Alle vijf de trappen werden er
 // dus zwakker van in plaats van beter. De hele meting staat in LESSEN-RL-BOT.md.
 //
-// GEMETEN STERKTE van deze vijf, elk tegen diepte 2 zonder foutkans, 150 delingen dubbel gespeeld
-// (18-09): Bob 2,8% - George 14,8% - Robert 44,2% - Ferdinand 48,0% - Stefaan 62,8%.
+// GEMETEN STERKTE van de vijf van toen (zonder netwerk), elk tegen diepte 2 zonder foutkans, 150 delingen
+// dubbel gespeeld (18-09): Bob 2,8% - George 14,8% - Robert 44,2% - Ferdinand 48,0% - Stefaan 62,8%.
 //
 // `rlBot: true` zet één trap op het getrainde netwerk in plaats van op deze zoeker. Dat staat nu
 // nergens aan. Het is bedoeld voor Bob en George: een bot die onzeker is speelt natuurlijker dan een
@@ -4439,8 +4450,8 @@ function aiGezicht(achtergrond, tekening){
 // Bewust geen verlopen of id's in de tekeningen: hetzelfde gezicht staat soms twee keer op de pagina (menu en
 // spel), en een verwijzing naar een id in een verborgen menu tekent in sommige browsers niets.
 const AI_TEGENSTANDERS = [
-  { niveau:1, naam:'Bob', graad:'Makkelijk', kleur:'#4cc36f', gloed:'rgba(76,195,111,.35)', diepte:1, foutkans:0.35, rlBot:false, temperatuur:0.10,
-    uitleg:'Bob speelt nog maar net. Hij ziet wel wat er op het bord gebeurt, maar kiest vaak niet de beste zet. Ideaal om het spel te leren.',
+  { niveau:1, naam:'Bob', graad:'Makkelijk', kleur:'#4cc36f', gloed:'rgba(76,195,111,.35)', diepte:2, foutkans:0.10, rlBot:false, temperatuur:0.10,
+    uitleg:'Bob speelt nog maar net. Hij kijkt maar kort vooruit en laat er geregeld eentje liggen. Ideaal om het spel te leren.',
     // Jong, propellerpetje, drie haartjes op de kin.
     gezicht: aiGezicht('#1d5234',
       '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#4cc36f"/>' +
@@ -4463,8 +4474,9 @@ const AI_TEGENSTANDERS = [
       '<ellipse cx="50" cy="56.5" rx="2.4" ry="1.8" fill="#e0a07a"/>' +
       '<path d="M41 61Q50 72 59 61Z" fill="#7a2a22"/><path d="M42.5 61.5H57.5Q56.5 64 50 64T42.5 61.5Z" fill="#fff"/>' +
       '<path d="M47 70.5L46.5 73M50 71V73.8M53 70.5L53.5 73" stroke="#9b5a2e" stroke-width="1.2" stroke-linecap="round"/>') },
-  { niveau:2, naam:'George', graad:'Vrij makkelijk', kleur:'#a6cf3f', gloed:'rgba(166,207,63,.35)', diepte:2, foutkans:0.2, rlBot:false, temperatuur:0.06,
-    uitleg:'George heeft de slag te pakken, maar twijfelt nog vaak tussen een goede en een minder goede zet. Wie oplet, wint van hem.',
+  { niveau:2, naam:'George', graad:'Vrij makkelijk', kleur:'#a6cf3f', gloed:'rgba(166,207,63,.35)', diepte:2, foutkans:0.05, rlBot:false, temperatuur:0.06,
+    eenbot: { diepte: 2, werelden: 1, wortelmarge: 0.1, legpas: true, snelschud: true },
+    uitleg:'George heeft de slag te pakken en speelt zonder slordigheden, maar hij kijkt niet ver vooruit. Wie verder denkt dan hij, wint.',
     // Brilletje, polo, stoppelbaardje.
     gezicht: aiGezicht('#3d5418',
       '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#a6cf3f"/>' +
@@ -4482,8 +4494,8 @@ const AI_TEGENSTANDERS = [
       '<circle cx="58" cy="47" r="6.2" fill="#fff" fill-opacity=".12" stroke="#2a2a2a" stroke-width="1.8"/>' +
       '<path d="M48 46Q50 44.5 52 46M35.8 46L30 44.5M64.2 46L70 44.5" fill="none" stroke="#2a2a2a" stroke-width="1.6" stroke-linecap="round"/>' +
       '<path d="M50 50Q47.5 55 50 55.5" fill="none" stroke="#c98a60" stroke-width="1.6" stroke-linecap="round"/>') },
-  { niveau:3, naam:'Robert', graad:'Gemiddeld', kleur:'#f0c233', gloed:'rgba(240,194,51,.35)', diepte:3, foutkans:0.1, rlBot:false, temperatuur:0.035,
-    uitleg:'Robert speelt een degelijke partij en laat er maar af en toe eentje liggen. Een eerlijke tegenstander.',
+  { niveau:3, naam:'Robert', graad:'Gemiddeld', kleur:'#f0c233', gloed:'rgba(240,194,51,.35)', diepte:AI_SEARCH_DEPTH, foutkans:0, rlBot:false, temperatuur:0.035,
+    uitleg:'Robert speelt een degelijke partij: hij denkt een paar zetten vooruit en maakt geen slordige fouten. Tot begin oktober was dit Stefaan.',
     // Houthakkershemd en een volle bruine baard.
     gezicht: aiGezicht('#574512',
       '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#a8402c"/>' +
@@ -4500,8 +4512,10 @@ const AI_TEGENSTANDERS = [
       '<circle cx="42" cy="47.5" r="2.6" fill="#1e140e"/><circle cx="58" cy="47.5" r="2.6" fill="#1e140e"/>' +
       '<circle cx="42.8" cy="46.8" r=".8" fill="#fff"/><circle cx="58.8" cy="46.8" r=".8" fill="#fff"/>' +
       '<path d="M49 49Q46 56 50 57T51 49Z" fill="#c28560"/>') },
-  { niveau:4, naam:'Ferdinand', graad:'Moeilijk', kleur:'#f08a32', gloed:'rgba(240,138,50,.35)', diepte:AI_SEARCH_DEPTH, foutkans:0.05, rlBot:false, temperatuur:0.02,
-    uitleg:'Ferdinand speelt bijna altijd de zet die hij zelf de beste vindt. Heel af en toe kiest hij de op een na beste: grijp die kans.',
+  { niveau:4, naam:'Ferdinand', graad:'Moeilijk', kleur:'#f08a32', gloed:'rgba(240,138,50,.35)', diepte:AI_SEARCH_DEPTH, foutkans:0, rlBot:false, temperatuur:0.02,
+    eenbot: { diepte: 3, schuifdiepte: 4, knoopgrens: 3000, werelden: 1, wortelmarge: 0.1, legpas: true,
+              ordendiepte: 3, snelschud: true, tt: true, killers: true },
+    uitleg:'Ferdinand denkt zoals Stefaan, alleen minder ver vooruit. Hij speelt altijd de zet die hij het sterkste vindt: je moet hem echt te slim af zijn.',
     // Kostuum, strikje, monocle, krulsnor en een spitse grijze baard.
     gezicht: aiGezicht('#5a3014',
       '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#2b2b36"/>' +
@@ -4524,7 +4538,8 @@ const AI_TEGENSTANDERS = [
       '<path d="M50 60.5C46 57 40 57.5 36.5 60.5 34 62.5 30.5 61.5 30.5 57.5 28.5 62.5 32.5 66.5 38 64.5 43 63 47 63 50 63S57 63 62 64.5C67.5 66.5 71.5 62.5 69.5 57.5 69.5 61.5 66 62.5 63.5 60.5 60 57.5 54 57 50 60.5Z" fill="#c4c4c4" stroke="#8d8d8d" stroke-width=".6"/>' +
       '<circle cx="58.5" cy="47" r="7" fill="#fff" fill-opacity=".15" stroke="#d9b44a" stroke-width="2"/>' +
       '<path d="M64.5 51C70 58 66 68 72 80" fill="none" stroke="#d9b44a" stroke-width="1.1"/>') },
-  { niveau:5, naam:'Stefaan', graad:'Heel moeilijk', kleur:'#e9483b', gloed:'rgba(233,72,59,.38)', diepte:AI_SEARCH_DEPTH, foutkans:0, rlBot:false, temperatuur:0,
+  { niveau:5, naam:'Stefaan', graad:'Meester', kleur:'#e9483b', gloed:'rgba(233,72,59,.38)', diepte:AI_SEARCH_DEPTH, foutkans:0, rlBot:false, temperatuur:0,
+    eenbot: true, // = EENBOT_OPTIES
     uitleg:'Stefaan speelt altijd de zet die hij het sterkste vindt. Hij leerde het spel door miljoenen partijen tegen zichzelf te spelen. Wie hem verslaat, mag trots zijn baard laten staan.',
     // De koning van de baarden: kroon, borstelige wenkbrauwen en een witte baard tot op de grond.
     gezicht: aiGezicht('#561816',
@@ -5310,7 +5325,8 @@ function rlKlaar(){ return rlStatus === 'klaar' && window.BaardenBot && BaardenB
 //   Diepte 7 (J) haalde 54,1% tegen I en ging niet live: elke zet dieper levert steeds minder op.
 //
 // Aan sinds 3 oktober 2026. `var` en niet `let`: renderAiKeuze() kan lopen voor deze regel bereikt
-// is, en dan mag dit niet struikelen. Op false zetten = trap 5 speelt weer als de oude Stefaan.
+// is, en dan mag dit niet struikelen. Op false zetten = elke trap speelt weer de oude AI, op zijn
+// eigen `diepte` en `foutkans` (George en Ferdinand worden dan wat zwakker dan gemeten).
 var EENBOT_AAN = true;
 // Diepte 6 in de schuiffase (daar levert diep zoeken het meest op), diepte 4 in de legfase.
 // Betaalbaar dankzij een transpositietabel (tt) en killer-zetten. Overschrijdt de diepe
@@ -5320,7 +5336,10 @@ var EENBOT_AAN = true;
 const EENBOT_OPTIES = { diepte: 4, schuifdiepte: 6, knoopgrens: 40000, werelden: 1,
                         wortelmarge: 0.1, legpas: true, ordendiepte: 5, snelschud: true,
                         tt: true, killers: true };
-var eenbotZoeker = null, eenbotStatus = 'ongeladen';
+// Eén netwerk voor alle trappen met EenBot (zie `eenbot` in AI_TEGENSTANDERS); elke trap krijgt zijn
+// eigen zoeker met zijn eigen instellingen, pas aangemaakt als die trap voor het eerst zet.
+var eenbotNetwerk = null, eenbotStatus = 'ongeladen';
+const eenbotZoekers = {};
 // Zelfde ?v=-afspraak als WAARDERING_PAD: train ik opnieuw, dan verandert dit getal mee.
 const EENBOT_NET_PAD = 'js/eenbot_net.json?v=20261003';
 
@@ -5329,15 +5348,22 @@ function eenbotLaad(){
   eenbotStatus = 'laden';
   fetch(EENBOT_NET_PAD)
     .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(blob => { eenbotZoeker = new EenBot.Zoeker(new EenBot.Netwerk(blob), EENBOT_OPTIES); eenbotStatus = 'klaar'; })
+    .then(blob => { eenbotNetwerk = new EenBot.Netwerk(blob); eenbotStatus = 'klaar'; })
     .catch(err => { eenbotStatus = 'mislukt'; console.warn('Baarden: EenBot laadde niet; de oude AI speelt.', err); });
 }
 // Meteen bij het openen van de pagina, niet pas als iemand een trap kiest: de eerste beurt van de
 // bot kan anders net voor het netwerk binnen is vallen, en dan speelt hij die met de oude AI.
 if(EENBOT_AAN) eenbotLaad();
 
-// Alleen trap 5. Een meetopstelling vervangt deze functie om EenBot per kleur aan te zetten.
-function eenbotSpeelt(){ return EENBOT_AAN && eenbotStatus === 'klaar' && aiTegenstander().niveau === 5; }
+// De EenBot-instellingen van een trap, of null als die trap de oude AI speelt. `eenbot: true` = EENBOT_OPTIES.
+function eenbotOptiesVoor(t){ return t && t.eenbot ? (t.eenbot === true ? EENBOT_OPTIES : t.eenbot) : null; }
+// Een meetopstelling vervangt deze twee functies om EenBot per kleur aan te zetten.
+function eenbotSpeelt(){ return EENBOT_AAN && eenbotStatus === 'klaar' && !!eenbotOptiesVoor(aiTegenstander()); }
+function eenbotZoekerNu(){
+  const t = aiTegenstander();
+  if(!eenbotZoekers[t.niveau]) eenbotZoekers[t.niveau] = new EenBot.Zoeker(eenbotNetwerk, eenbotOptiesVoor(t));
+  return eenbotZoekers[t.niveau];
+}
 
 // Eén beurt. Een opbouwkeuze of een herleving is gewoon de volgende beslissing van dezelfde beurt.
 async function eenbotBeurt(){
@@ -5347,7 +5373,7 @@ async function eenbotBeurt(){
     const g = EenBot.vanBrowser(state, 120);
     const legaal = g.legalActions();
     if(!legaal.length) return false;
-    const actie = eenbotZoeker.kies(g, legaal);
+    const actie = eenbotZoekerNu().kies(g, legaal);
     if(!await rlVoerUit(BaardenActies.decodeer(actie, aiColor), aiColor)) return false;
     if(!state || state.winner || state.turn !== aiColor) return true;
     if(!state.towerBuild && !state.reviveChoice) return true;
