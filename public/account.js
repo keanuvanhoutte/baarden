@@ -45,9 +45,9 @@ auth.languageCode = 'nl';
    Tegen de AI loopt de beloning sterk op met de moeilijkheid: Bob verslaan is zo gebeurd, Stefaan
    niet. Online levert net iets meer op dan Stefaan, want daar zit een echt mens tegenover. Verliezen
    levert ook wat op, zodat wie tegen sterkere tegenstanders oefent niet met lege handen blijft.
-   Met 50 XP per tier is tier 25 na een twintigtal gewonnen online partijen bereikt. */
+   Met 50 XP per tier is tier 20 na een vijftiental gewonnen online partijen bereikt. */
 const XP_PER_TIER = 50;
-const MAX_TIER = 25;
+const MAX_TIER = 20;
 const XP_REGELS = {
   online: { winst: 60, verlies: 15, gelijk: 22 },
   // Per AI-niveau, van 1 = Bob tot 5 = Stefaan.
@@ -65,7 +65,7 @@ function xpVoor(modus, uitslag, aiNiveau){
   return Array.isArray(xp) ? xp[Math.max(1, Math.min(xp.length, aiNiveau || 1)) - 1] : xp;
 }
 
-// Tier 1 heb je meteen; elke 50 XP komt er een bij, tot en met tier 25. Daarna blijft de XP gewoon
+// Tier 1 heb je meteen; elke 50 XP komt er een bij, tot en met tier 20. Daarna blijft de XP gewoon
 // tellen, maar de balk staat vol.
 function tierVan(xp){
   const totaal = Math.max(0, xp || 0);
