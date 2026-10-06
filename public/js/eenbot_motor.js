@@ -215,14 +215,15 @@
   Game.prototype.drawThree = function (color) {
     const hand = this.hand[color];
     if (hand.length) { for (const c of hand) this.discard[color].push(c); hand.length = 0; }
-    if (this.drawPile[color].length < 3 && this.discard[color].length) {
-      for (const c of this.discard[color]) this.drawPile[color].push(c);
+    // Eerst de laatste kaarten van de trekstapel, dan pas de aflegstapel schudden (zoals
+    // baarden_game.py en het spel sinds 6 oktober 2026).
+    const pile = this.drawPile[color];
+    while (hand.length < 3 && pile.length) hand.push(pile.pop());
+    if (hand.length < 3 && this.discard[color].length) {
+      for (const c of this.discard[color]) pile.push(c);
       this.discard[color] = [];
-      this.rng.shuffle(this.drawPile[color]);
-    }
-    for (let i = 0; i < 3; i++) {
-      if (!this.drawPile[color].length) break;
-      hand.push(this.drawPile[color].pop());
+      this.rng.shuffle(pile);
+      while (hand.length < 3 && pile.length) hand.push(pile.pop());
     }
   };
   Game.prototype.noCardsLeft = function (color) {

@@ -1,6 +1,6 @@
 # Baarden — Spelregels
 
-> Status: **v0.12 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
+> Status: **v0.12.1 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
 
 ---
 
@@ -65,7 +65,7 @@ Rooster van **3 kolommen × 7 rijen**. Rijen worden benoemd `a`–`g` (verticaal
 **Cyclus van de trekstapel:**
 - Een speler blijft, ronde na ronde, kaarten van zijn trekstapel trekken tot die volledig leeg is.
 - Zodra de trekstapel leeg is, wordt de aflegstapel geschud en wordt dat de nieuwe trekstapel.
-- **Randgeval:** als de trekstapel te weinig kaarten meer heeft om de volle 3 te trekken, wordt de aflegstapel **eerder** geschud en samengevoegd, zodat de hand toch tot 3 aangevuld kan worden.
+- **Randgeval:** als de trekstapel te weinig kaarten meer heeft om de volle 3 te trekken, trek je **eerst die laatste kaarten**. Pas dan wordt de aflegstapel geschud tot nieuwe trekstapel, en vul je daaruit je hand aan tot 3. Een kaart die al getrokken werd, komt dus nooit terug zolang er nog ongetrokken kaarten in de trekstapel liggen.
 - In de digitale versie worden beide trek- en aflegstapels ook **visueel in het klein** getoond op het bord.
 
 ---
@@ -219,6 +219,7 @@ Geen — alle regels zijn bevestigd. Dit document beschrijft het volledige, afge
 
 ## 10. Wijzigingslog
 
+- **v0.12.1** — Verduidelijking + bugfix (sectie 4, randgeval): als de trekstapel minder dan 3 kaarten heeft, trek je eerst die laatste kaarten en schud je pas daarna de aflegstapel. De digitale versie schudde die laatste kaarten tot nu toe mee in de aflegstapel, waardoor een al getrokken kaart kon terugkomen terwijl ongetrokken kaarten onderaan bleven liggen.
 - **v0.12** — Nieuwe regel (sectie 5.2, punt 3): heb je in de bewegingsfase geen kaart op het bord die kan bewegen, dan mag je passen. Tot hiertoe was je in die situatie (vooral vroeg in het spel, als je eerste kaart naar je toren of in hold ging) verplicht je blok-kaart op een kaart van de tegenstander te leggen. Dit vervangt ook het tijdelijke vangnet "geen zet mogelijk" uit v0.4.2. De bot past zelf nog niet vrijwillig: hij speelt zoals hij getraind is en legt in die situatie nog zijn blok-kaart, wat binnen de regels blijft.
 - **v0.11** — Correctie (sectie 8.1a): bij het doorbreken van een gestapeld vakje **overleeft de aanvallende kaart altijd** en neemt ze het vakje in; de stapel die er lag gaat naar de gesneuvelden van de respectieve eigenaars en blijft dus herleefbaar. Tot hiertoe stond er dat alle betrokken kaarten volledig uit het spel verdwenen, inclusief je eigen aanvaller. Dat klopte niet met hoe het spel zich al die tijd gedroeg — enkel kaarten die je in je toren verwerkt verdwijnen écht. De regeltekst in het spel en de PDF waren op 13-09 al gecorrigeerd; dit document liep achter.
 - **v0.10** — Nieuwe regel (sectie 8.3): komt exact dezelfde stelling (zelfde bord, zelfde speler aan zet in dezelfde fase) voor de 3de keer voor, dan eindigt het spel in een gelijkspel, net als in schaken. De digitale versie waarschuwt subtiel na de 2de keer.

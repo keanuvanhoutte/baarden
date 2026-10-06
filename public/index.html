@@ -3707,16 +3707,19 @@ function pushLog(msg){
 }
 
 /* ======================= TREKSTAPEL / AFLEGSTAPEL ======================= */
+// Een getrokken kaart komt niet opnieuw zolang de trekstapel niet leeg is. Liggen er nog maar 1 of 2
+// kaarten, dan trek je EERST die; pas dan wordt de aflegstapel geschud tot nieuwe trekstapel en vul je
+// daaruit aan tot 3. (Tot 6 oktober 2026 werden die laatste kaarten mee in de aflegstapel geschud, en
+// kon een al getrokken kaart terugkomen terwijl zij onderaan bleven liggen.)
 function drawThreeFresh(color){
   if(state.hand[color].length){ state.discard[color].push(...state.hand[color]); state.hand[color] = []; }
-  if(state.draw[color].length < 3 && state.discard[color].length>0){
-    state.draw[color] = shuffle(state.draw[color].concat(state.discard[color]));
+  const hand = state.hand[color];
+  while(hand.length < 3 && state.draw[color].length) hand.push(state.draw[color].pop());
+  if(hand.length < 3 && state.discard[color].length>0){
+    state.draw[color] = shuffle(state.discard[color]);
     state.discard[color] = [];
-    pushLog(`${label(color)} schudt de aflegstapel samen met de trekstapel.`);
-  }
-  for(let i=0;i<3;i++){
-    if(state.draw[color].length===0) break;
-    state.hand[color].push(state.draw[color].pop());
+    pushLog(`${label(color)} schudt de aflegstapel tot nieuwe trekstapel.`);
+    while(hand.length < 3 && state.draw[color].length) hand.push(state.draw[color].pop());
   }
 }
 
