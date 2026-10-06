@@ -688,6 +688,37 @@ veranderde — dezelfde vingerafdruk-hashes vóór en na.
 > **Regel.** Een visuele fout toets je op het scherm, niet in de toestand. Dat
 > de kaart in `state.board` staat, zegt niet dat een speler haar ziet liggen.
 
+## 4.7 Een meetlat gevuld uit je eigen zoeker
+
+`js/test_stefaan.js` vergelijkt de Python-bot met de bot in het spel en stond
+maandenlang op 299/299. De ijkpunten kwamen uit ZELFSPEL: stellingen die de
+zoeker zelf gespeeld had. Dezelfde proef, dezelfde dag, gevuld met stellingen
+uit zeven partijen die een mens gespeeld had:
+
+| stellingen uit | bladwaarde | schuiffase | legfase |
+|---|---|---|---|
+| zelfspel | 300/300 | 140/140 | **159/159** |
+| menspartijen | 300/300 | 112/112 | **130/186** |
+
+Bijna een derde van de legfase-stellingen geeft een andere zet. Dat verschil
+zat er al die tijd; de proef kon het alleen niet zien, omdat hij precies het
+soort stelling toetste waar de twee het wél eens zijn.
+
+Het kostte bovendien een omweg van dagen. De afwijking was eerst gemeten door
+de zet van de zoeker te vergelijken met wat er in de opname GESPEELD was, en
+dat wees naar de schuiffase. Die meting telt twee dingen bij elkaar op: of de
+zoekers het eens zijn, en of je uit de opname wel de juiste zet afleidt. De
+directe vergelijking -- twee motoren, zelfde stelling, welke zet -- wees
+meteen naar de legfase, en de schuiffase bleek foutloos.
+
+> **Regel.** Vul een meetlat met stellingen die je nabouw NIET zelf gekozen
+> heeft. Anders toets je de overeenstemming op het gebied waar die vanzelf
+> klopt.
+>
+> **Regel.** Vergelijk de twee kanten rechtstreeks op dezelfde invoer. Een
+> vergelijking die via een opname loopt, meet ook je heropbouw mee, en dan weet
+> je bij een verschil niet welke van de twee stuk is.
+
 ---
 
 # Deel 5 — Checklist voor het volgende spel
