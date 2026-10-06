@@ -2045,23 +2045,22 @@ const RUSTIGE_TAFELS = {
 };
 
 /* ======================= BATTLEPASS =======================
-   20 tiers, elke 50 XP een tier (de XP-regels staan in account.js). Vanaf tier 4 om de 1 à 2 tiers een
-   beloning: de zes meest uitgesproken kaartdesigns, drie emotes met geluid en twee plaagzinnetjes. Wat in deze lijst
+   20 tiers, elke 50 XP een tier (de XP-regels staan in account.js). Om de 2 tiers een beloning
+   (tier 2, 4, … 20): de vijf meest uitgesproken kaartdesigns, drie emotes met geluid en twee plaagzinnetjes. Wat in deze lijst
    staat, is op slot tot je die tier haalt; al de rest blijft voor iedereen vrij. Niet ingelogd = tier 0,
    dus alles hierin op slot.
 
    Een beloning verwijst met haar id naar CARD_SKINS (soort 'design') of naar EMOTES ('emote' en
    'tekst'). De volgorde loopt op in pracht, met de Scherpschutter als pronkstuk op tier 20. */
 const BATTLEPASS = [
-  { tier: 4,  soort:'tekst',  id:'alles' },
-  { tier: 6,  soort:'design', id:'magma' },
-  { tier: 7,  soort:'emote',  id:'clown',  naam:'Clown' },
-  { tier: 9,  soort:'design', id:'neon' },
+  { tier: 2,  soort:'tekst',  id:'alles' },
+  { tier: 4,  soort:'design', id:'magma' },
+  { tier: 6,  soort:'emote',  id:'clown',  naam:'Clown' },
+  { tier: 8,  soort:'design', id:'neon' },
   { tier:10,  soort:'tekst',  id:'wankel' },
   { tier:12,  soort:'design', id:'holo' },
   { tier:14,  soort:'emote',  id:'rip',    naam:'Doodskop' },
-  { tier:15,  soort:'design', id:'barok' },
-  { tier:17,  soort:'design', id:'obsidiaan' },
+  { tier:16,  soort:'design', id:'barok' },
   { tier:18,  soort:'design', id:'bladgoud' },
   { tier:20,  soort:'emote',  id:'sniper', naam:'Scherpschutter' },
 ];
