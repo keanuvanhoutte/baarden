@@ -1,6 +1,6 @@
 # Baarden — Spelregels
 
-> Status: **v0.12.1 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
+> Status: **v0.12.2 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
 
 ---
 
@@ -57,7 +57,7 @@ Rooster van **3 kolommen × 7 rijen**. Rijen worden benoemd `a`–`g` (verticaal
 | Onderdeel | Beschrijving |
 |---|---|
 | **Trekstapel** | Bij start: alle kaarten van je kleur, min je toren-2 (dus 25 kaarten). |
-| **Aflegstapel** | Kaarten die niet gekozen/gebruikt werden, of veroverd (vernietigd) zijn. |
+| **Aflegstapel** | Handkaarten die niet gekozen/gebruikt werden. Een kaart die op het bord geslagen wordt, gaat **niet** hierheen maar naar de gesneuvelden (zie 8.1). |
 | **Hand** | 3 kaarten, elke ronde vers getrokken (zie 5.1). |
 | **Hold** | 1 los vakje naast je hand — 1 kaart kan hier "in bewaring" gelegd worden (zie 5.1). |
 | **Blok-kaart** | 1 apart stuk, geen deel van de 26 kleurkaarten. Ligt bij start naast het bord. |
@@ -175,7 +175,7 @@ Tijdens de bewegingsfase (5.2) verplaats je een kaart 1 vakje. **Bevestigd:** di
 ### 8.1 Tegen een gewone kaart van de tegenstander
 | Situatie | Resultaat |
 |---|---|
-| Jouw kaart heeft een **hogere** waarde | Je **vernietigt** de kaart van de tegenstander (naar zijn aflegstapel) en neemt het vakje in. |
+| Jouw kaart heeft een **hogere** waarde | Je **vernietigt** de kaart van de tegenstander (naar zijn **gesneuvelden**, ongeacht de waarde) en neemt het vakje in. |
 | Jouw kaart heeft een **gelijke** waarde | Je kaart komt **boven op** de kaart van de tegenstander te liggen (stapelen). De onderste kaart is dan **geblokkeerd** (kan niet bewegen) tot de bovenste kaart wegbeweegt. De bovenste kaart zelf ondervindt geen beperking. |
 | Jouw kaart heeft een **lagere** waarde | Illegale zet. |
 
@@ -184,7 +184,7 @@ Als het vakje dat je aanvalt (met een hogere waarde) al **meer dan 1 kaart** bev
 
 Enkel de kaarten die je in je toren verwerkt verdwijnen écht uit het spel. Bij het doorbreken van een stapel verdwijnt er dus niets definitief.
 
-Omdat een stapel altijd kleur-per-kleur afwisselt (je kan nooit op je eigen kleur stapelen), sneuvelt bij het doorbreken naast de kaart van de tegenstander ook je **eigen, daaronder geblokkeerd liggende kaart**. Die is niet weg: hij ligt bij je gesneuvelden en komt in aanmerking om herleefd te worden. Een gewoon (niet-gestapeld) vakje aanvallen blijft de normale regel uit 8.1 volgen (kaart vernietigd naar de aflegstapel, jij neemt het vakje in).
+Omdat een stapel altijd kleur-per-kleur afwisselt (je kan nooit op je eigen kleur stapelen), sneuvelt bij het doorbreken naast de kaart van de tegenstander ook je **eigen, daaronder geblokkeerd liggende kaart**. Die is niet weg: hij ligt bij je gesneuvelden en komt in aanmerking om herleefd te worden. Een gewoon (niet-gestapeld) vakje aanvallen volgt de normale regel uit 8.1 (kaart vernietigd naar de gesneuvelden, jij neemt het vakje in).
 
 **Voorbeeld:** een zwarte vrouw ligt bovenop een rode vrouw (2 lagen). Een rode aas verslaat de zwarte vrouw. Beide vrouwen gaan naar de gesneuvelden van hun eigen eigenaar; de rode aas blijft leven en komt op het vakje te liggen.
 
@@ -219,6 +219,7 @@ Geen — alle regels zijn bevestigd. Dit document beschrijft het volledige, afge
 
 ## 10. Wijzigingslog
 
+- **v0.12.2** — Correctie (secties 4 en 8.1): elke kaart die op het bord geslagen wordt, gaat naar de **gesneuvelden** van zijn eigenaar, ongeacht de waarde — nooit naar de aflegstapel. Enkel kaarten die gebruikt zijn om de toren op te waarderen verdwijnen permanent. Zo speelt het spel al sinds v0.9; dit document zei op drie plekken nog "aflegstapel".
 - **v0.12.1** — Verduidelijking + bugfix (sectie 4, randgeval): als de trekstapel minder dan 3 kaarten heeft, trek je eerst die laatste kaarten en schud je pas daarna de aflegstapel. De digitale versie schudde die laatste kaarten tot nu toe mee in de aflegstapel, waardoor een al getrokken kaart kon terugkomen terwijl ongetrokken kaarten onderaan bleven liggen.
 - **v0.12** — Nieuwe regel (sectie 5.2, punt 3): heb je in de bewegingsfase geen kaart op het bord die kan bewegen, dan mag je passen. Tot hiertoe was je in die situatie (vooral vroeg in het spel, als je eerste kaart naar je toren of in hold ging) verplicht je blok-kaart op een kaart van de tegenstander te leggen. Dit vervangt ook het tijdelijke vangnet "geen zet mogelijk" uit v0.4.2. De bot past zelf nog niet vrijwillig: hij speelt zoals hij getraind is en legt in die situatie nog zijn blok-kaart, wat binnen de regels blijft.
 - **v0.11** — Correctie (sectie 8.1a): bij het doorbreken van een gestapeld vakje **overleeft de aanvallende kaart altijd** en neemt ze het vakje in; de stapel die er lag gaat naar de gesneuvelden van de respectieve eigenaars en blijft dus herleefbaar. Tot hiertoe stond er dat alle betrokken kaarten volledig uit het spel verdwenen, inclusief je eigen aanvaller. Dat klopte niet met hoe het spel zich al die tijd gedroeg — enkel kaarten die je in je toren verwerkt verdwijnen écht. De regeltekst in het spel en de PDF waren op 13-09 al gecorrigeerd; dit document liep achter.
