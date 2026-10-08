@@ -615,6 +615,61 @@
   }
 
   // -------------------------------------------------------- determinisatie
+  // Plan-kenmerken: 18 extra getallen voor een netwerk met invoer LEN + N_PLAN (zie RL/plan.py,
+  // dezelfde definitie; js/test_plan.js toetst dat beide gelijk rekenen). Een netwerk met 233
+  // invoer ziet ze nooit, dus de live bot rekent precies zoals voorheen.
+  const N_PLAN = 18;
+  function planKant(g, wie, zelf, v, o) {
+    const t = g.towerValue(wie);
+    const dood = new Array(15).fill(0);
+    for (const c of g.fallen[wie]) dood[c.value]++;
+    for (const c of g.destroyed[wie]) dood[c.value]++;
+    for (const p of g.board[TOWER_OF[wie]]) if (p.kind === TOWERLAYER) dood[p.value]++;
+    const leeft = w => (w === 2 ? 1 : 2) - dood[w];
+    for (let i = 0; i < 9; i++) v[o + i] = 0;
+    if (t + 1 <= 11) v[o] = leeft(t + 1) / 2;
+    const klaar = new Set();
+    if (zelf) {
+      for (const c of g.hand[wie]) klaar.add(c.value);
+      if (g.hold[wie] !== null) klaar.add(g.hold[wie].value);
+    }
+    for (const n of NBD[TOWER_OF[wie]]) {
+      if (n < 0) continue;
+      const s = g.board[n], p = s.length ? s[s.length - 1] : null;
+      if (p && p.owner === wie && p.kind === NORMAL) klaar.add(p.value);
+    }
+    let k = 0;
+    while (t + k + 1 <= 11 && klaar.has(t + k + 1)) k++;
+    v[o + 1] = Math.min(k, 4) / 4;
+    let doodN = 0;
+    for (let w = t + 1; w <= Math.min(t + 3, 11); w++) if (leeft(w) <= 0) doodN++;
+    v[o + 2] = doodN / 3;
+    v[o + 3] = (11 - t) / 9;
+    const doel = TOWER_OF[OTHER[wie]], ve = g.towerValue(OTHER[wie]);
+    const dr = Math.floor(doel / 3), dc = doel % 3;
+    const dichtbij = [false, false, false];
+    let naast = 0;
+    for (let cel = 0; cel < 21; cel++) {
+      const s = g.board[cel];
+      if (!s.length) continue;
+      const p = s[s.length - 1];
+      if (p.owner !== wie || p.kind !== NORMAL || p.value <= ve) continue;
+      const d = Math.abs(Math.floor(cel / 3) - dr) + Math.abs(cel % 3 - dc), kol = cel % 3;
+      if (d === 0) continue;
+      if (1 / d > v[o + 4 + kol]) v[o + 4 + kol] = 1 / d;
+      if (d <= 2) dichtbij[kol] = true;
+      if (d === 1) naast++;
+    }
+    v[o + 7] = (dichtbij[0] + dichtbij[1] + dichtbij[2]) / 3;
+    v[o + 8] = Math.min(naast, 2) / 2;
+  }
+  function planKenmerken(g, v, o) {
+    const out = v || new Float64Array(N_PLAN), off = v ? o : 0;
+    planKant(g, g.currentPlayer, true, out, off);
+    planKant(g, OTHER[g.currentPlayer], false, out, off + 9);
+    return out;
+  }
+
   function verborgenVoorraad(g, kleur) {
     const over = new Map(), volgorde = [];
     for (const k of buildColorDeck(kleur)) {
@@ -654,6 +709,16 @@
     g.hand[opp] = voorraad.slice(i, i + nHand); i += nHand;
     g.drawPile[opp] = voorraad.slice(i, i + nTrek); i += nTrek;
     g.discard[opp] = voorraad.slice(i);
+    return g;
+  }
+
+  // Alleen voor metingen (optie `alwetend`): de echte hand, hold en aflegstapel van de
+  // tegenstander blijven staan; alleen de volgorde van beide trekstapels wordt geschud. Zo'n
+  // zoeker speelt vals met wat er NU verborgen is, maar kent de toekomstige trekkingen niet.
+  function determiniseerAlwetend(game, rng) {
+    const g = game.clone();
+    g.rng = rng;
+    for (const k of ['red', 'black']) { const p = g.drawPile[k].slice(); rng.shuffle(p); g.drawPile[k] = p; }
     return g;
   }
 
@@ -704,6 +769,22 @@
   const WINST = 2.0;
 
   function isVrij(g) { return g.buildCandidates.length > 0 || g.pendingRevive !== null; }
+  function stukken(g) { let n = 0; for (let i = 0; i < 21; i++) n += g.board[i].length; return n; }
+  // Hefboom C, winst-in-één aan de bladeren (optie `qwinst`): staat wie aan zet is in de schuiffase
+  // met een kaart naast de vijandelijke toren die hem neemt, dan is de stelling gewonnen -- geen
+  // schatting van het netwerk nodig. Hoogstens 4 vakjes nakijken.
+  function winstInEen(g) {
+    if (g.phase !== MOVE || g.gameOver || isVrij(g)) return false;
+    const ik = g.currentPlayer, T = TOWER_OF[OTHER[ik]];
+    for (const n of NBD[T]) {
+      if (n < 0) continue;
+      const s = g.board[n];
+      if (!s.length) continue;
+      const p = s[s.length - 1];
+      if (p.owner === ik && p.kind === NORMAL && evaluateOnBoard(g.board, p, T) === WINS) return true;
+    }
+    return false;
+  }
 
   function Zoeker(net, opties) {
     opties = opties || {};
@@ -717,6 +798,33 @@
     this.legbreedte = opties.legbreedte !== undefined ? opties.legbreedte : null;
     this.legpas = !!opties.legpas;
     this.snelschud = !!opties.snelschud;
+    this.alwetend = !!opties.alwetend;
+    this.qwinst = !!opties.qwinst;
+    // Hefboom E (7 oktober): in de legfase over meer gedetermineerde werelden middelen dan in de
+    // schuiffase (0 = zelfde als `werelden`).
+    this.legwerelden = opties.legwerelden ? opties.legwerelden : 0;
+    // Hefboom C (7 oktober): late-move reductions. Vanaf de lmr-de zet (in zoekvolgorde) wordt een
+    // rustige schuifzet (geen slag, geen winst) eerst een zet minder diep met een smal venster
+    // bekeken; alleen als hij beter blijkt, opnieuw volledig. 0 = uit.
+    this.lmr = opties.lmr ? opties.lmr : 0;
+    this.lmrReducties = 0; this.lmrHerzoek = 0;
+    this.qwinstTreffers = 0;
+    // Hefboom A (7 oktober): na de gewone zoektocht van I nog dieper zolang er budget is.
+    // budget = knopen voor de hele beslissing (deterministisch, dus meetbaar en herhaalbaar);
+    // extra = hoeveel zetten dieper hoogstens; tijdgrens = harde rem in ms (vangnet voor trage
+    // toestellen; 0 = uit). Zonder budget speelt de zoeker exact als voorheen.
+    // Stijl (8 oktober, RL/resultaten/STIJL-LOG.md): de leg-regels van een sterke menselijke
+    // speler als kleine voorkeur op de wortelwaarden (bonus voor opwaarderen, malus voor een
+    // legzet die een regel breekt). Kleiner dan de wortelmarge, zodat de regel alleen beslist
+    // tussen zetten die de zoeker ongeveer even goed vindt. '' = uit (exact I).
+    this.stijl = opties.stijl ? String(opties.stijl) : '';
+    this.stijlBonus = opties.stijlBonus !== undefined ? opties.stijlBonus : 0.08;
+    this._stijlBezig = false;
+    this.budget = opties.budget ? opties.budget : 0;
+    this.extra = opties.extra !== undefined ? opties.extra : 2;
+    this.tijdgrens = opties.tijdgrens ? opties.tijdgrens : 0;
+    this._tijdEind = Infinity;
+    this.verdiept = 0; this.verdiepPogingen = 0;
     // Zoeken onder een knopenlimiet: eerst op de volle diepte met hoogstens `knoopgrens`
     // knopen; wordt die overschreden, dan opnieuw (zonder limiet) op diepte-1. Zo zoekt hij
     // diep waar het betaalbaar is, zonder uitschieters van seconden. Deterministisch:
@@ -749,15 +857,27 @@
     this.wortelRonde = 0;
     this.geschiedenis = new Float64Array(N_ACTIONS);
     this.knopen = 0; this.bladen = 0;
-    this._v = new Float64Array(LEN);
+    // Een netwerk met meer invoer dan LEN verwacht er de plan-kenmerken achter.
+    this._v = new Float64Array(this.V.lagen[0].cols);
+    this._plan = this.V.lagen[0].cols === LEN + N_PLAN;
+    if (this.V.lagen[0].cols !== LEN && !this._plan) throw new Error('netwerk met onbekende invoer: ' + this.V.lagen[0].cols);
   }
+  Zoeker.prototype.invoer = function (g) {
+    vector(g, this._v);
+    if (this._plan) planKenmerken(g, this._v, LEN);
+    return this._v;
+  };
   Zoeker.prototype.kosten = function (g) {
     if (isVrij(g)) return 0;
     return g.phase === PLACE ? this.legkosten : 1;
   };
   Zoeker.prototype.blad = function (g) {
     this.bladen++;
-    const v = this.V.waarde(vector(g, this._v));
+    if (this.qwinst && winstInEen(g)) {
+      this.qwinstTreffers++;
+      return g.currentPlayer === this.wortel ? WINST - 0.05 : -(WINST - 0.05);
+    }
+    const v = this.V.waarde(this.invoer(g));
     return g.currentPlayer === this.wortel ? v : -v;
   };
   Zoeker.prototype.eind = function (g, afstand) {
@@ -782,7 +902,8 @@
       kind.step(a, false);
       let s;
       if (kind.gameOver) s = this.eind(kind, afstand + 1);
-      else { const v = this.V.waarde(vector(kind, this._v)); s = kind.currentPlayer === this.wortel ? v : -v; }
+      else if (this.qwinst && winstInEen(kind)) s = kind.currentPlayer === this.wortel ? WINST - 0.05 : -(WINST - 0.05);
+      else { const v = this.V.waarde(this.invoer(kind)); s = kind.currentPlayer === this.wortel ? v : -v; }
       k.push([s, a, kind]);
     }
     k.sort(maxi ? (x, y) => y[0] - x[0] : (x, y) => x[0] - y[0]);
@@ -809,6 +930,7 @@
   Zoeker.prototype.zoek = function (g, diepte, alfa, beta, afstand) {
     this.knopen++;
     if (this.knopen > this._grens) throw AFBREKEN;
+    if ((this.knopen & 1023) === 0 && this._tijdEind !== Infinity && Date.now() > this._tijdEind) throw AFBREKEN;
     if (g.gameOver) return this.eind(g, afstand);
     if (diepte <= 0) {
       if (!this.ttBlad) return this.blad(g);
@@ -864,13 +986,22 @@
       }
     }
     const EPS = 1e-9;
-    let besteA = -1, eerste = true;
+    let besteA = -1, eerste = true, nr = 0;
+    const lmrHier = this.lmr && diepte >= 3 && kosten > 0 && g.phase === MOVE && !isVrij(g);
+    const stukkenHier = lmrHier ? stukken(g) : 0;
     for (const item of reeks) {
       const a = item[1];
       let kind = item[2];
       if (kind === null) { kind = g.clone(); kind.step(a, false); }
       let v;
-      if (this.pvs && !eerste && beta - alfa > EPS) {
+      nr++;
+      if (lmrHier && nr > this.lmr && a < A_PLACE_HAND && !kind.gameOver && stukken(kind) === stukkenHier
+          && (maxi ? alfa > -Infinity : beta < Infinity)) {
+        this.lmrReducties++;
+        v = maxi ? this.zoek(kind, diepte - kosten - 1, alfa, alfa + EPS, afstand + 1)
+                 : this.zoek(kind, diepte - kosten - 1, beta - EPS, beta, afstand + 1);
+        if (maxi ? v > alfa : v < beta) { this.lmrHerzoek++; v = this.zoek(kind, diepte - kosten, alfa, beta, afstand + 1); }
+      } else if (this.pvs && !eerste && beta - alfa > EPS) {
         // smal venster: is deze zet beter dan de beste tot nu toe? Zo ja, opnieuw met het
         // volle venster, zodat de waarde exact blijft.
         if (maxi) {
@@ -916,7 +1047,8 @@
     let volgorde = legaal.slice();
     for (let k = 0; k < this.werelden; k++) {
       this._tt.clear();
-      const wereld = determiniseer(game, kleur, new PyRandom(basis + k * 15485863));
+      const wereld = this.alwetend ? determiniseerAlwetend(game, new PyRandom(basis + k * 15485863))
+        : determiniseer(game, kleur, new PyRandom(basis + k * 15485863));
       wereld.rng = this.snelschud ? new SnelSchudder(basis + k) : new Schudder(basis + k);
       let reeks;
       if (k === 0) reeks = this.kinderen(wereld, legaal, true, 0).map(t => [t[1], t[2]]);
@@ -939,7 +1071,44 @@
     for (const [a, s] of som) uit.set(a, s / this.werelden);
     return uit;
   };
+  // De regels, vanuit de eigen kleur (zwart gespiegeld; de actienummers zijn dat al):
+  //   o opwaarderen   w a2/b1/b3 alleen opwaardeerbaar of H/A   n a1/a3 niet beleggen
+  //   v c1-c3 alleen H/A/2   t de 2 niet op a1-a3/b1/b3   q geen V leggen na ronde 3
+  const ST_OPW = new Set(['a2', 'b1', 'b3']), ST_NOOD = new Set(['a1', 'a3']), ST_VOOR = new Set(['c1', 'c2', 'c3']);
+  function stijlMag(regels, cel, r, toren, ronde) {
+    if (regels.includes('w') && ST_OPW.has(cel) &&
+        !(r === 'K' || r === 'A' || (r !== '2' && toren < RANK_VALUE[r] && RANK_VALUE[r] <= 11))) return false;
+    if (regels.includes('n') && ST_NOOD.has(cel)) return false;
+    if (regels.includes('v') && ST_VOOR.has(cel) && !(r === 'K' || r === 'A' || r === '2')) return false;
+    if (regels.includes('t') && r === '2' && (ST_OPW.has(cel) || ST_NOOD.has(cel))) return false;
+    if (regels.includes('q') && r === 'Q' && ronde > 3) return false;
+    return true;
+  }
+  function stijlBonus(game, legaal, regels, d) {
+    if (game.phase !== PLACE && game.phase !== MOVE) return null;
+    const kleur = game.currentPlayer, toren = game.towerValue(kleur), m = new Map();
+    for (const a of legaal) {
+      if (a === A_TOWER_BUILD) { if (regels.includes('o')) m.set(a, d); continue; }
+      let cel = null, r = null;
+      if (game.phase === PLACE && a >= A_PLACE_HAND && a < A_HAND_TO_HOLD) {
+        const k = a - A_PLACE_HAND;
+        cel = ALL_CELLS[k % N_CELLS]; r = game.hand[kleur][Math.floor(k / N_CELLS)].rank;
+      } else if (a >= A_HOLD_TO_FIELD && a < A_TOWER_BUILD && game.hold[kleur]) {
+        cel = ALL_CELLS[a - A_HOLD_TO_FIELD]; r = game.hold[kleur].rank;
+      }
+      if (cel !== null && !stijlMag(regels, cel, r, toren, game.roundNumber)) m.set(a, -d);
+    }
+    return m.size ? m : null;
+  }
   Zoeker.prototype.kies = function (game, legaal) {
+    if (!this.stijl || this._stijlBezig || this.bonus) return this._kiesKern(game, legaal);
+    legaal = legaal || game.legalActions();
+    if (legaal.length < 2) return this._kiesKern(game, legaal);
+    this._stijlBezig = true;
+    this.bonus = stijlBonus(game, legaal, this.stijl, this.stijlBonus);
+    try { return this._kiesKern(game, legaal); } finally { this.bonus = null; this._stijlBezig = false; }
+  };
+  Zoeker.prototype._kiesKern = function (game, legaal) {
     legaal = legaal || game.legalActions();
     if (!legaal.length) return null;
     if (legaal.length === 1) return legaal[0];
@@ -949,13 +1118,37 @@
     const beste = w => {
       let best = null, bw = -Infinity;
       for (const a of legaal) {         // oplopend: bij gelijke waarde de laagste index
-        const x = w.get(a);
+        // bonus: per beslissing van buitenaf (RL/stijlbot.py), standaard geen.
+        const x = w.get(a) + (this.bonus ? (this.bonus.get(a) || 0) : 0);
         if (x > bw) { bw = x; best = a; }
       }
       return best;
     };
     const basis = this.diepte;
     const D = (this.schuifdiepte !== null && game.phase === MOVE) ? this.schuifdiepte : basis;
+    if (this.legwerelden && game.phase === PLACE && !this._inLeg) {
+      const w0 = this.werelden;
+      this.werelden = this.legwerelden; this._inLeg = true;
+      try { return this.kies(game, legaal); } finally { this.werelden = w0; this._inLeg = false; }
+    }
+    if (this.budget && !this._inBudget) {
+      // Eerst exact de gewone zoektocht (dezelfde diepte, limiet en terugval als zonder budget).
+      const eind = this.knopen + this.budget, t0 = Date.now();
+      let keuze;
+      this._inBudget = true;
+      try { keuze = this.kies(game, legaal); } finally { this._inBudget = false; }
+      // Dan dieper zolang het budget het toelaat; een afgebroken diepte telt niet.
+      if (this.tijdgrens) this._tijdEind = t0 + this.tijdgrens;
+      try {
+        for (let d = D + 1; d <= D + this.extra && this.knopen < eind; d++) {
+          this.diepte = d; this._grens = eind; this.verdiepPogingen++;
+          try { keuze = beste(this.waarden(game, legaal)); this.verdiept++; }
+          catch (e) { if (e !== AFBREKEN) throw e; break; }
+          finally { this._grens = Infinity; }
+        }
+      } finally { this.diepte = basis; this._tijdEind = Infinity; }
+      return keuze;
+    }
     try {
       this.diepte = D;
       if (this.knoopgrens === null) return beste(this.waarden(game, legaal));
@@ -1074,7 +1267,7 @@
   }
 
   const api = {
-    Game, Piece, Card, PyRandom, Schudder, SnelSchudder, Netwerk, Zoeker, vector, determiniseer,
+    Game, Piece, Card, PyRandom, Schudder, SnelSchudder, Netwerk, Zoeker, vector, planKenmerken, N_PLAN, determiniseer,
     verborgenVoorraad, evaluateOnBoard, vanPython, vanBrowser, buildColorDeck, nieuwSpel,
     ALL_CELLS, CELL_IDX, MIRROR, NBD, TERR, RANKS, RANK_VALUE, RANK_IDX,
     A_MOVE, A_PLACE_HAND, A_HAND_TO_HOLD, A_HOLD_TO_FIELD, A_TOWER_BUILD, A_BLOCK, A_PASS,
