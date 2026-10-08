@@ -5337,12 +5337,13 @@ var EENBOT_AAN = true;
 // in de browser). Zie HERBOUW-LOG, "Weg 1".
 // Stijl (kandidaat, 8 oktober): de leg-regels van een sterke menselijke speler als kleine
 // voorkeur op de wortelwaarden: opwaarderen (o), a2/b1/b3 voor opwaardeerkaarten en H/A (w),
-// a1/a3 vrij (n), vooraan alleen H/A/2 (v), de 2 niet achteraan (t), geen V na ronde 3 (q).
+// a1/a3 vrij (n), vooraan alleen H/A/2 (v), de 2 niet achteraan (t), geen V na ronde 3 (q),
+// en uit zijn partijen gehaald: de hold is een reserve voor H/A/2 (h).
 // 0,08 is kleiner dan de wortelmarge: ziet de zoeker een echt gevaar, dan wint zijn oordeel.
 // Kost geen bedenktijd. Zie RL/resultaten/STIJL-LOG.md.
 const EENBOT_OPTIES = { diepte: 4, schuifdiepte: 6, knoopgrens: 40000, werelden: 1,
                         wortelmarge: 0.1, legpas: true, ordendiepte: 5, snelschud: true,
-                        tt: true, killers: true, stijl: 'owvntq', stijlBonus: 0.08 };
+                        tt: true, killers: true, stijl: 'owvntqh', stijlBonus: 0.08 };
 // Eén netwerk voor alle trappen met EenBot (zie `eenbot` in AI_TEGENSTANDERS); elke trap krijgt zijn
 // eigen zoeker met zijn eigen instellingen, pas aangemaakt als die trap voor het eerst zet.
 var eenbotNetwerk = null, eenbotStatus = 'ongeladen';

@@ -1097,6 +1097,35 @@
         cel = ALL_CELLS[a - A_HOLD_TO_FIELD]; r = game.hold[kleur].rank;
       }
       if (cel !== null && !stijlMag(regels, cel, r, toren, game.roundNumber)) m.set(a, -d);
+      // Eigen vondsten uit de menspartijen (8 oktober; standaard uit):
+      //   h  de hold is een reserve voor H/A/2: zo'n kaart erin +d, een andere erin -d
+      //   x  slaan: een schuifzet die een gewone vijandelijke kaart slaat of stapelt +d
+      //   e  zuinig: met al 3+ eigen kaarten op het bord geen kaart (behalve H/A) meer leggen -d
+      //   (h, x, e, a: verkend in RL/resultaten/STIJL-LOG.md, deel 2)
+      let extra = 0;
+      if (regels.includes('h') && game.phase === PLACE && a >= A_HAND_TO_HOLD && a < A_HOLD_TO_FIELD) {
+        const rh = game.hand[kleur][a - A_HAND_TO_HOLD].rank;
+        extra += (rh === 'K' || rh === 'A' || rh === '2') ? d : -d;
+      }
+      if (regels.includes('x') && game.phase === MOVE && a < A_PLACE_HAND) {
+        const flip = kleur === 'black', van = flip ? MIRROR[Math.floor(a / 4)] : Math.floor(a / 4);
+        let rr = a % 4; if (flip && rr < 2) rr = 1 - rr;
+        const naar = NBD[van][rr], st = naar >= 0 ? game.board[naar] : null;
+        const top = st && st.length ? st[st.length - 1] : null;
+        if (top && top.owner !== kleur && top.kind === NORMAL) extra += d;
+      }
+      if (regels.includes('e') && cel !== null && game.phase === PLACE && r !== 'K' && r !== 'A') {
+        let eigen = 0;
+        for (let i = 0; i < N_CELLS; i++) {
+          const st = game.board[i], top = st.length ? st[st.length - 1] : null;
+          if (top && top.owner === kleur && top.kind === NORMAL) eigen++;
+        }
+        if (eigen >= 3) extra -= d;
+      }
+      //   a  vroeg aanvallen: in ronde 1-4 een H/A vooraan (c1-c3) leggen +d
+      if (regels.includes('a') && cel !== null && game.phase === PLACE && (r === 'K' || r === 'A') &&
+          ST_VOOR.has(cel) && game.roundNumber <= 4) extra += d;
+      if (extra) m.set(a, Math.max(-d, Math.min(d, (m.get(a) || 0) + extra)));
     }
     return m.size ? m : null;
   }
