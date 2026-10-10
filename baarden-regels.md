@@ -1,6 +1,6 @@
 # Baarden — Spelregels
 
-> Status: **v0.12.2 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
+> Status: **v0.12.3 — regels volledig afgerond.** Dit document is bewust modulair opgebouwd (losse genummerde regels per sectie) zodat je snel kan aanvullen of aanpassen. Alle regels zijn bevestigd; nieuwe wijzigingen worden hier toegevoegd zodra ze expliciet worden doorgegeven.
 
 ---
 
@@ -91,7 +91,7 @@ Het spel verloopt in **rondes**. Elke ronde heeft twee fases die **na elkaar** d
    - **Een kaart 1 vakje verschuiven** (horizontaal/verticaal) — naar een leeg vakje, of tegen een kaart van de tegenstander (zie sectie 8 voor de gevechtsregels).
    - **Toren opwaarderen** — met kaarten die orthogonaal naast je toren liggen en/of je hold-kaart (zie sectie 7).
 2. Daarna doet de **andere speler** zijn actie, volgens dezelfde regels.
-3. **Passen mag als je geen beweegbare kaart hebt.** Ligt er van jou geen enkele kaart op het bord die kan bewegen (geen kaart, of enkel kaarten die gestapeld/geblokkeerd liggen of nergens heen kunnen), dan mag je je bewegingsbeurt **passen**. Vooral in het begin van het spel komt dit voor, bv. als je eerste kaart naar je toren of in hold ging. Je bent dan dus **niet verplicht** je blok-kaart op een kaart van de tegenstander te leggen. Dit blijft gelden, ronde na ronde, tot je weer een kaart op het bord hebt die kan bewegen. Passen is een keuze: de blok-kaart leggen, je hold-kaart plaatsen of je toren opwaarderen mag nog steeds. De blok-kaart zelf telt niet als beweegbare kaart.
+3. **Passen mag alleen als je echt geen zet hebt.** Ligt er van jou geen enkele kaart op het bord die kan bewegen (geen kaart, of enkel kaarten die gestapeld/geblokkeerd liggen of nergens heen kunnen), heb je geen hold-kaart om te leggen en kan je je toren niet opwaarderen, én ligt je **blok-kaart nog naast het bord**, dan mag je je bewegingsbeurt **passen**. Dat komt enkel helemaal in het begin van het spel voor, bv. als je eerste kaart naar je toren of in hold ging. Je bent dus nooit verplicht je blok-kaart in het spel te brengen. **Ligt je blok-kaart eenmaal op het bord, dan ben je verplicht te spelen:** een kaart bewegen, je hold-kaart leggen, je toren opwaarderen of je blok-kaart verleggen. Passen mag dan alleen nog als ook dat allemaal onmogelijk is (bv. je blok-kaart ligt zelf geblokkeerd en er is niets anders), zodat het spel nooit vastloopt.
 4. Zodra beide spelers hun actie gedaan hebben, is de ronde voorbij → terug naar 5.1, met de andere speler als beginnende speler.
 
 ---
@@ -110,7 +110,7 @@ De blok-kaart is eigenlijk de **joker** van elke speler. Elke speler heeft er **
 
 **Bevestigd** — De blok-kaart mag **nooit** op een torenvakje gelegd worden (ook niet op een opgewaardeerde torenlaag). Enkel gewone vijandelijke kaarten (of een vijandelijke blok-kaart) kunnen geblokkeerd worden. Een toren blijft dus altijd enkel via de gewone verover-regel (sectie 8.2) te grazen te nemen.
 
-**Bevestigde afhankelijkheid:** als een speler in fase 1 past (of anderszins nog geen enkele kaart op het bord heeft liggen), dan heeft hij in fase 2 mogelijk geen gewone kaart om te bewegen. De blok-kaart plaatsen mag dan, maar **moet niet**: sinds v0.12 mag hij in dat geval gewoon passen (sectie 5.2, punt 3). Dat vervangt ook het oude tijdelijke vangnet "geen zet mogelijk".
+**Bevestigde afhankelijkheid:** als een speler in fase 1 past (of anderszins nog geen enkele kaart op het bord heeft liggen), dan heeft hij in fase 2 mogelijk geen gewone kaart om te bewegen. Zolang zijn blok-kaart nog **naast het bord** ligt, mag hij hem dan in het spel brengen, maar dat **moet niet**: hij mag in dat geval passen (sectie 5.2, punt 3). Dat vervangt ook het oude tijdelijke vangnet "geen zet mogelijk". **Eens de blok-kaart op het bord ligt, vervalt die uitzondering:** wie geen kaart kan bewegen, geen hold-kaart heeft en zijn toren niet kan opwaarderen, is dan verplicht zijn blok-kaart te verleggen (zolang er een geldig doelvakje is).
 
 ---
 
@@ -219,6 +219,7 @@ Geen — alle regels zijn bevestigd. Dit document beschrijft het volledige, afge
 
 ## 10. Wijzigingslog
 
+- **v0.12.3** — Correctie (sectie 5.2, punt 3 en sectie 6): passen in de bewegingsfase mag **alleen** zolang je blok-kaart nog naast het bord ligt én je verder niets kan (geen beweegbare kaart, geen hold-kaart, geen toren-opwaardering). Ligt je blok-kaart eenmaal op het bord, dan ben je verplicht te spelen: een kaart bewegen, je hold-kaart leggen, je toren opwaarderen of je blok-kaart verleggen. v0.12 was te ruim geformuleerd: het spel liet ook midden in de partij passen zodra je geen gewone kaart op het bord had, terwijl de hold-kaart of de blok-kaart nog gespeeld moesten worden. Alleen als werkelijk niets kan, mag je nog passen (vangnet tegen vastlopen).
 - **v0.12.2** — Correctie (secties 4 en 8.1): elke kaart die op het bord geslagen wordt, gaat naar de **gesneuvelden** van zijn eigenaar, ongeacht de waarde — nooit naar de aflegstapel. Enkel kaarten die gebruikt zijn om de toren op te waarderen verdwijnen permanent. Zo speelt het spel al sinds v0.9; dit document zei op drie plekken nog "aflegstapel".
 - **v0.12.1** — Verduidelijking + bugfix (sectie 4, randgeval): als de trekstapel minder dan 3 kaarten heeft, trek je eerst die laatste kaarten en schud je pas daarna de aflegstapel. De digitale versie schudde die laatste kaarten tot nu toe mee in de aflegstapel, waardoor een al getrokken kaart kon terugkomen terwijl ongetrokken kaarten onderaan bleven liggen.
 - **v0.12** — Nieuwe regel (sectie 5.2, punt 3): heb je in de bewegingsfase geen kaart op het bord die kan bewegen, dan mag je passen. Tot hiertoe was je in die situatie (vooral vroeg in het spel, als je eerste kaart naar je toren of in hold ging) verplicht je blok-kaart op een kaart van de tegenstander te leggen. Dit vervangt ook het tijdelijke vangnet "geen zet mogelijk" uit v0.4.2. De bot past zelf nog niet vrijwillig: hij speelt zoals hij getraind is en legt in die situatie nog zijn blok-kaart, wat binnen de regels blijft.
