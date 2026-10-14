@@ -765,6 +765,123 @@
     return Math.tanh(h[0]);
   };
 
+  // Correctie (14 oktober, RL/correctie.py): het net schat enkele kaarten verkeerd in (Aas te laag,
+  // Heer te hoog, de 2 tegenover een vijandelijke Aas en kaarten in de eigen hold te laag). Een
+  // kleine bijsturing in logit-ruimte met 8 kenmerken uit dezelfde toestandsvector:
+  //   eigen H, eigen A, vijand H, vijand A, eigen 2 x vijand A, vijand 2 x eigen A,
+  //   eigen hold 2, eigen hold A/H.        v' = tanh(atanh(v) + w.f / 2)
+  // Set 2 (46 gewichten, RL/correctie.py --set 2 + RL/residu.py): ook kaarten die hangen (naast een
+  // vrije vijandelijke kaart die ze slaat, apart in leg- en schuiffase), blokgebonden kaarten, wat er
+  // onder de blokken ligt, ongebruikte blokken, een Aas naast een toren en gestapelde vakjes.
+  const C_BUREN = [];
+  for (let i = 0; i < 21; i++) {
+    const r = Math.floor(i / 3), k = i % 3, nb = [];
+    for (const [dr, dk] of [[-1, 0], [1, 0], [0, -1], [0, 1]])
+      if (r + dr >= 0 && r + dr < 7 && k + dk >= 0 && k + dk < 3) nb.push((r + dr) * 3 + k + dk);
+    C_BUREN.push(nb);
+  }
+  const C_TOREN_EIGEN = 4, C_TOREN_VIJAND = 16;
+  function cSlaat(a, d) { if (a === 14 && d === 2) return false; return (a === 2 && d === 14) || a > d; }
+  function cGroepBlok(w) { return w === 14 ? 0 : w === 13 ? 1 : w === 2 ? 2 : (w >= 3 && w <= 12 ? 3 : -1); }
+  function cGroepHangt(w) { return w === 14 ? 0 : w === 13 ? 1 : w === 2 ? 2 : (w === 11 || w === 12) ? 3 : (w >= 3 && w <= 10 ? 4 : -1); }
+  function GecorrigeerdNet(net, w) {
+    this.net = net; this.lagen = net.lagen; this.w = Float64Array.from(w);
+    if (w.length !== 8 && w.length !== 46 && w.length !== 64) throw new Error('correctie: 8, 46 of 64 gewichten verwacht, niet ' + w.length);
+    this._f = new Float64Array(w.length);
+    this._top = new Int32Array(21); this._onder = new Int32Array(21); this._blok = new Int32Array(21);
+    this._gewoon = new Uint8Array(21);
+  }
+  GecorrigeerdNet.prototype.waarde = function (x) {
+    const v = this.net.waarde(x), w = this.w, f = this._f;
+    f.fill(0);
+    const top = this._top, onder = this._onder, blok = this._blok, gewoon = this._gewoon;
+    let eA = 0, vA = 0;
+    for (let i = 0; i < 21; i++) {
+      const b = i * 5;
+      top[i] = Math.round(x[b] * 14); onder[i] = Math.round(x[b + 4] * 14); blok[i] = Math.round(x[b + 2]);
+      gewoon[i] = (x[b + 1] === 0 && blok[i] === 0 && top[i] !== 0) ? 1 : 0;
+      if (!gewoon[i]) continue;
+      const r = top[i];
+      if (r === 13) f[0]++; else if (r === 14) { f[1]++; eA++; }
+      else if (r === -13) f[2]++; else if (r === -14) { f[3]++; vA++; }
+    }
+    let e2 = 0, v2 = 0;
+    for (let i = 0; i < 21; i++) if (gewoon[i]) { if (top[i] === 2) e2++; else if (top[i] === -2) v2++; }
+    f[4] = e2 * vA; f[5] = v2 * eA;
+    f[6] = x[O_HOLD]; f[7] = x[O_HOLD + 11] + x[O_HOLD + 12];
+    if (w.length >= 46) {
+      const set3 = w.length === 64, ik = x[LEN - 3], leg = 1 - x[LEN - 9];
+      // 8..15: eigen blok op A/H/2/anders, vijand blok op A/H/2/anders
+      for (let i = 0; i < 21; i++) {
+        if (blok[i] === 0) continue;
+        const g = cGroepBlok(Math.abs(onder[i]));
+        if (g >= 0) f[(blok[i] > 0 ? 8 : 12) + g]++;
+      }
+      f[16] = x[O_BLOK]; f[17] = x[O_BLOK + 3];
+      const schuif = x[LEN - 9];
+      for (let i = 0; i < 21; i++) {
+        if (!gewoon[i]) continue;
+        const s = top[i] > 0 ? 1 : -1, wi = Math.abs(top[i]), nb = C_BUREN[i];
+        // hangt: 26.. (schuif), 36.. (leg); per groep eigen dan vijand
+        const g = cGroepHangt(wi);
+        if (g >= 0) {
+          let hangt = false;
+          for (const j of nb) if (gewoon[j] && (top[j] > 0 ? 1 : -1) === -s && cSlaat(Math.abs(top[j]), wi)) { hangt = true; break; }
+          if (hangt) {
+            const k = 2 * g + (s > 0 ? 0 : 1);
+            f[26 + k] += schuif;
+            // set 3: de legfase gesplitst naar wie straks als eerste schuift
+            if (set3) { f[36 + k] += leg * ik; f[46 + k] += leg * (1 - ik); } else f[36 + k] += 1 - schuif;
+          }
+        }
+        // 18/19: blokgebonden eigen/vijand
+        for (const j of nb) {
+          if (blok[j] === s && onder[j] !== 0 && (onder[j] > 0 ? 1 : -1) === -s && cSlaat(Math.abs(onder[j]), wi)) {
+            f[s > 0 ? 18 : 19]++; break;
+          }
+        }
+        // 24/25: gestapeld eigen/vijand boven
+        if (top[i] > 0 && onder[i] < 0) f[24]++; else if (top[i] < 0 && onder[i] > 0) f[25]++;
+      }
+      // 20..23: 2 bij de eigen toren x vijandelijke Aas, omgekeerd, Aas naast de vijandelijke/eigen toren
+      let e2t = 0, v2t = 0, eAt = 0, vAt = 0;
+      for (const j of C_BUREN[C_TOREN_EIGEN]) if (gewoon[j]) { if (top[j] === 2) e2t++; else if (top[j] === -14) vAt++; }
+      for (const j of C_BUREN[C_TOREN_VIJAND]) if (gewoon[j]) { if (top[j] === -2) v2t++; else if (top[j] === 14) eAt++; }
+      f[20] = e2t * vA; f[21] = v2t * eA; f[22] = eAt; f[23] = vAt;
+      if (set3) {
+        // 56-59: een 2 naast een leeg legvak van de tegenstander (die er na de legfase een kaart naast kan
+        // leggen), per wie straks als eerste schuift. 60-63: de ontblok-techniek ligt klaar (eigen blok op X,
+        // eigen vrije kaart ernaast die X slaat of evenaart), apart als ze nu uitvoerbaar is.
+        let e2b = 0, v2b = 0;
+        for (let i = 0; i < 21; i++) {
+          if (!gewoon[i] || (top[i] !== 2 && top[i] !== -2)) continue;
+          const vijandVak = top[i] === 2;
+          for (const j of C_BUREN[i]) {
+            const b = j * 5;
+            if (x[b] !== 0 || x[b + 1] !== 0 || x[b + 2] !== 0) continue;
+            if (vijandVak ? (j >= 12 && j !== 16) : (j <= 8 && j !== 4)) { if (vijandVak) e2b++; else v2b++; break; }
+          }
+        }
+        f[56] = e2b * leg * (1 - ik); f[57] = e2b * leg * ik; f[58] = v2b * leg * ik; f[59] = v2b * leg * (1 - ik);
+        for (const [s, k0, tijd] of [[1, 60, schuif * (1 - ik)], [-1, 62, schuif * ik]]) {
+          let klaar = 0;
+          for (let j = 0; j < 21; j++) {
+            if (blok[j] !== s || onder[j] === 0 || (onder[j] > 0 ? 1 : -1) !== -s) continue;
+            const xv = Math.abs(onder[j]);
+            for (const c of C_BUREN[j]) {
+              if (gewoon[c] && (top[c] > 0 ? 1 : -1) === s && (cSlaat(Math.abs(top[c]), xv) || Math.abs(top[c]) === xv)) { klaar++; break; }
+            }
+          }
+          f[k0] = klaar * tijd; f[k0 + 1] = klaar * (1 - tijd);
+        }
+      }
+    }
+    let z = 0;
+    for (let k = 0; k < w.length; k++) z += w[k] * f[k];
+    const c = Math.max(-0.999999, Math.min(0.999999, v));
+    return Math.tanh(Math.atanh(c) + z / 2);
+  };
+
   // --------------------------------------------------------------- zoeker
   const WINST = 2.0;
 
@@ -788,7 +905,7 @@
 
   function Zoeker(net, opties) {
     opties = opties || {};
-    this.V = net;
+    this.V = opties.correctie ? new GecorrigeerdNet(net, opties.correctie) : net;
     this.diepte = opties.diepte !== undefined ? opties.diepte : 3;
     this.werelden = opties.werelden !== undefined ? opties.werelden : 4;
     this.legkosten = opties.legkosten !== undefined ? opties.legkosten : 1;
@@ -1084,9 +1201,21 @@
     if (regels.includes('q') && r === 'Q' && ronde > 3) return false;
     return true;
   }
+  function stijlDreiging(g, kleur) {
+    const tw = g.towerValue(kleur), t = TOWER_OF[kleur], tr = Math.floor(t / 3), tc = t % 3;
+    let n = 0;
+    for (let i = 0; i < N_CELLS; i++) {
+      const st = g.board[i], p = st.length ? st[st.length - 1] : null;
+      if (!p || p.owner === kleur || p.kind !== NORMAL) continue;
+      if (Math.abs(Math.floor(i / 3) - tr) + Math.abs(i % 3 - tc) > 2) continue;
+      if (p.value > tw && !(p.rank === 'A' && tw === 2)) n++;
+    }
+    return n;
+  }
   function stijlBonus(game, legaal, regels, d) {
     if (game.phase !== PLACE && game.phase !== MOVE) return null;
     const kleur = game.currentPlayer, toren = game.towerValue(kleur), m = new Map();
+    const doelen = regels.includes('u') ? stijlBlokDoelen(game, kleur) : [];
     for (const a of legaal) {
       if (a === A_TOWER_BUILD) { if (regels.includes('o')) m.set(a, d); continue; }
       let cel = null, r = null;
@@ -1125,9 +1254,119 @@
       //   a  vroeg aanvallen: in ronde 1-4 een H/A vooraan (c1-c3) leggen +d
       if (regels.includes('a') && cel !== null && game.phase === PLACE && (r === 'K' || r === 'A') &&
           ST_VOOR.has(cel) && game.roundNumber <= 4) extra += d;
+      //   b  de blok-kaart op een vijandelijke H/A (de speler blokkeert vooral die, in rij e) +d
+      if (regels.includes('b') && game.phase === MOVE && a >= A_BLOCK && a < A_PASS) {
+        const doel = kleur === 'black' ? MIRROR[a - A_BLOCK] : a - A_BLOCK, st = game.board[doel];
+        const top = st.length ? st[st.length - 1] : null;
+        if (top && top.owner !== kleur && (top.rank === 'K' || top.rank === 'A')) extra += d;
+      }
+      //   l  laddertrede: een kaart van toren+1 .. toren+3 op a2/b1/b3 leggen +d (PATRONEN.md §1)
+      if (regels.includes('l') && cel !== null && game.phase === PLACE && ST_OPW.has(cel) && r !== '2' &&
+          RANK_VALUE[r] > toren && RANK_VALUE[r] <= toren + 3) extra += d;
+      //   k  de V als keeper: na ronde 3 de V niet naar voren schuiven -d
+      if (regels.includes('k') && game.phase === MOVE && a < A_PLACE_HAND && game.roundNumber > 3) {
+        const flip = kleur === 'black', van = flip ? MIRROR[Math.floor(a / 4)] : Math.floor(a / 4);
+        let rr = a % 4; if (flip && rr < 2) rr = 1 - rr;
+        const naar = NBD[van][rr], st = game.board[van], top = st.length ? st[st.length - 1] : null;
+        const vooruit = flip ? Math.floor(naar / 3) < Math.floor(van / 3) : Math.floor(naar / 3) > Math.floor(van / 3);
+        if (top && top.owner === kleur && top.rank === 'Q' && vooruit) extra -= d;
+      }
+      //   d  dreiging opruimen: een zet waarna minder vijandelijke kaarten de eigen toren binnen 2
+      //      stappen kunnen slaan (slaan of blokken van zo'n kaart) +d (PATRONEN.md §3)
+      if (regels.includes('d') && game.phase === MOVE) {
+        const k = game.clone(); k.rng = new SnelSchudder(0); k.step(a, false);
+        if (!k.gameOver && stijlDreiging(k, kleur) < stijlDreiging(game, kleur)) extra += d;
+      }
+      //   z  Aaszorg (13 okt, de 7 partijen tegen K2): de eigen Aas niet naast de vijandelijke toren
+      //      zetten als die toren op 7+ staat (reset naar 2 via Boer dreigt) en er een vijandelijke 2
+      //      op afstand <= 2 van dat veld staat (de 2 slaat de Aas) -d
+      if (regels.includes('z') && game.phase === MOVE && a < A_PLACE_HAND) {
+        const flip = kleur === 'black', van = flip ? MIRROR[Math.floor(a / 4)] : Math.floor(a / 4);
+        let rr = a % 4; if (flip && rr < 2) rr = 1 - rr;
+        const naar = NBD[van][rr], st = game.board[van], top = st.length ? st[st.length - 1] : null;
+        const tegen = kleur === 'red' ? 'black' : 'red', vt = TOWER_OF[tegen];
+        if (top && top.owner === kleur && top.rank === 'A' && naar >= 0 && NBD[vt].includes(naar) &&
+            game.towerValue(tegen) >= 7) {
+          const nr = Math.floor(naar / 3), nc = naar % 3;
+          for (let i = 0; i < N_CELLS; i++) {
+            const t2 = game.board[i].length ? game.board[i][game.board[i].length - 1] : null;
+            if (t2 && t2.owner === tegen && t2.kind === NORMAL && t2.rank === '2' &&
+                Math.abs(Math.floor(i / 3) - nr) + Math.abs(i % 3 - nc) <= 2) { extra -= d; break; }
+          }
+        }
+      }
+      //   u  ontblok (14 okt, de speler: "de unblock-techniek is key"), g blokgebonden, y de 2 niet
+      //      laten hangen: zie stijlTechniek().
+      if ((regels.includes('u') || regels.includes('g') || regels.includes('y')) && !isVrij(game))
+        extra += stijlTechniek(game, a, kleur, regels, d, doelen);
       if (extra) m.set(a, Math.max(-d, Math.min(d, (m.get(a) || 0) + extra)));
     }
     return m.size ? m : null;
+  }
+  function stTop(g, i) { const s = g.board[i]; return s.length ? s[s.length - 1] : null; }
+  function stSlaat(a, b) { if (a === 'A' && b === '2') return false; return (a === '2' && b === 'A') || RANK_VALUE[a] > RANK_VALUE[b]; }
+  function stEigenVrij(g, i, kleur) { const t = i >= 0 ? stTop(g, i) : null; return t && t.owner === kleur && t.kind === NORMAL ? t : null; }
+  // [vakje, vijandelijke kaart] onder de eigen blok
+  function stijlBlokDoelen(g, kleur) {
+    const uit = [];
+    for (let i = 0; i < N_CELLS; i++) {
+      const s = g.board[i];
+      if (s.length >= 2 && s[s.length - 1].kind === BLOCK && s[s.length - 1].owner === kleur &&
+          s[s.length - 2].owner !== kleur && s[s.length - 2].kind === NORMAL) uit.push([i, s[s.length - 2]]);
+    }
+    return uit;
+  }
+  // De technieken van de speler (14 oktober, RL/DOEL.md), als bonus/malus voor actie a:
+  //   u  ontblok. Eigen blok op vijandelijke kaart X.
+  //      - legfase, ik schuif deze ronde als TWEEDE, nog geen eigen kaart naast X die hem slaat/evenaart:
+  //        zo'n kaart naast X leggen +d;
+  //      - schuiffase als tweede, met zo'n kaart klaar naast X: de blok weg van X +d (de volgende ronde
+  //        schuif ik als eerste en neem X voor hij weg kan);
+  //      - schuiffase als EERSTE: de blok weg van een X die meteen een eigen kaart ernaast slaat -d.
+  //   g  blokgebonden: een eigen kaart, zonder iets te slaan, naast een vijandelijke kaart onder de eigen
+  //      blok zetten die hem slaat -d (het screenshot: de 9 op d1 voor de Heer).
+  //   y  de 2 niet laten hangen: de 2 (zonder een Aas te slaan) naar een vak schuiven naast een vrije
+  //      vijandelijke kaart die hem slaat of naast een leeg vijandelijk legvak, tenzij hij daar een
+  //      vijandelijke Aas bedreigt -d.
+  function stijlTechniek(game, a, kleur, regels, d, doelen) {
+    const tegen = OTHER[kleur], tweede = game.starter !== kleur;
+    const k = game.clone(); k.rng = new SnelSchudder(0); k.step(a, false);
+    let x = 0, nieuw = -1, sloeg = false, sloegAas = false;
+    for (let i = 0; i < N_CELLS; i++) {
+      const t0 = stTop(game, i), t1 = stTop(k, i);
+      if (t1 && t1.owner === kleur && t1.kind === NORMAL && t1 !== t0) {
+        nieuw = i;
+        if (t0 && t0.owner === tegen && t0.kind === NORMAL) { sloeg = true; if (t0.rank === 'A') sloegAas = true; }
+      }
+    }
+    if (regels.includes('u')) {
+      for (const [X, xp] of doelen) {
+        const klaar = NBD[X].some(c => { const t = stEigenVrij(game, c, kleur); return t && (stSlaat(t.rank, xp.rank) || t.rank === xp.rank); });
+        const tk = stTop(k, X), blokWeg = !(tk && tk.kind === BLOCK && tk.owner === kleur);
+        if (game.phase === PLACE && tweede && !klaar && nieuw >= 0 && NBD[X].includes(nieuw)) {
+          const t = stTop(k, nieuw);
+          if (stSlaat(t.rank, xp.rank) || t.rank === xp.rank) x += d;
+        }
+        if (game.phase === MOVE && tweede && klaar && blokWeg) x += d;
+        if (game.phase === MOVE && !tweede && blokWeg &&
+            NBD[X].some(c => { const t = stEigenVrij(game, c, kleur); return t && stSlaat(xp.rank, t.rank); })) x -= d;
+      }
+    }
+    if (regels.includes('g') && nieuw >= 0 && !sloeg) {
+      const t = stTop(k, nieuw);
+      for (const [X, xp] of stijlBlokDoelen(k, kleur)) if (NBD[X].includes(nieuw) && stSlaat(xp.rank, t.rank)) { x -= d; break; }
+    }
+    if (regels.includes('y') && game.phase === MOVE && a < A_PLACE_HAND && nieuw >= 0 && !sloegAas && stTop(k, nieuw).rank === '2') {
+      let gevaar = false, aas = false;
+      for (const c of NBD[nieuw]) {
+        if (c < 0) continue;
+        const u = stTop(k, c);
+        if (u && u.owner === tegen && u.kind === NORMAL) { if (u.rank === 'A') aas = true; else if (u.rank !== '2') gevaar = true; }
+        else if (!u && TERR[tegen].includes(c)) gevaar = true;
+      }
+      if (gevaar && !aas) x -= d;
+    }
+    return x;
   }
   Zoeker.prototype.kies = function (game, legaal) {
     if (!this.stijl || this._stijlBezig || this.bonus) return this._kiesKern(game, legaal);
