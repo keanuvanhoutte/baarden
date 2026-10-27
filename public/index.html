@@ -4457,7 +4457,7 @@ function aiGezicht(achtergrond, tekening){
 // spel), en een verwijzing naar een id in een verborgen menu tekent in sommige browsers niets.
 const AI_TEGENSTANDERS = [
   { niveau:1, naam:'Bob', graad:'Makkelijk', kleur:'#4cc36f', gloed:'rgba(76,195,111,.35)', diepte:2, foutkans:0.68, rlBot:false, temperatuur:0.10,
-    uitleg:'Bob speelt nog maar net. Meestal legt hij zomaar iets neer, maar soms ziet hij wel een goede zet. Ideaal om het spel te leren.',
+    uitleg:'Bob is nieuw in het spel en heeft nog maar drie baardharen. Meestal legt hij zomaar iets neer, maar soms ziet hij wel een goede zet. Ideaal om de regels te leren.',
     // Jong, propellerpetje, drie haartjes op de kin.
     gezicht: aiGezicht('#1d5234',
       '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#4cc36f"/>' +
@@ -4481,7 +4481,7 @@ const AI_TEGENSTANDERS = [
       '<path d="M41 61Q50 72 59 61Z" fill="#7a2a22"/><path d="M42.5 61.5H57.5Q56.5 64 50 64T42.5 61.5Z" fill="#fff"/>' +
       '<path d="M47 70.5L46.5 73M50 71V73.8M53 70.5L53.5 73" stroke="#9b5a2e" stroke-width="1.2" stroke-linecap="round"/>') },
   { niveau:2, naam:'George', graad:'Vrij makkelijk', kleur:'#a6cf3f', gloed:'rgba(166,207,63,.35)', diepte:2, foutkans:0.27, rlBot:false, temperatuur:0.06,
-    uitleg:'George heeft de slag beet en speelt meestal een goede zet, maar hij kijkt niet ver vooruit en laat er nog geregeld eentje liggen.',
+    uitleg:'George heeft de slag te pakken en speelt meestal een goede zet. Zijn baard is nog maar stoppels: hij kijkt niet ver vooruit en laat er nog geregeld een kans liggen.',
     // Brilletje, polo, stoppelbaardje.
     gezicht: aiGezicht('#3d5418',
       '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#a6cf3f"/>' +
@@ -4500,7 +4500,7 @@ const AI_TEGENSTANDERS = [
       '<path d="M48 46Q50 44.5 52 46M35.8 46L30 44.5M64.2 46L70 44.5" fill="none" stroke="#2a2a2a" stroke-width="1.6" stroke-linecap="round"/>' +
       '<path d="M50 50Q47.5 55 50 55.5" fill="none" stroke="#c98a60" stroke-width="1.6" stroke-linecap="round"/>') },
   { niveau:3, naam:'Robert', graad:'Gemiddeld', kleur:'#f0c233', gloed:'rgba(240,194,51,.35)', diepte:AI_SEARCH_DEPTH, foutkans:0, rlBot:false, temperatuur:0.035,
-    uitleg:'Robert speelt een degelijke partij: hij denkt een paar zetten vooruit en maakt geen slordige fouten. Tot begin oktober was dit Stefaan.',
+    uitleg:'Robert speelt een degelijke partij: hij denkt een paar zetten vooruit en maakt geen slordige fouten. Met zijn volle baard is hij de eerste tegenstander die je serieus moet nemen.',
     // Houthakkershemd en een volle bruine baard.
     gezicht: aiGezicht('#574512',
       '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#a8402c"/>' +
@@ -4520,7 +4520,7 @@ const AI_TEGENSTANDERS = [
   { niveau:4, naam:'Ferdinand', graad:'Moeilijk', kleur:'#f08a32', gloed:'rgba(240,138,50,.35)', diepte:AI_SEARCH_DEPTH, foutkans:0, rlBot:false, temperatuur:0.02,
     eenbot: { diepte: 4, schuifdiepte: 5, knoopgrens: 40000, werelden: 1, wortelmarge: 0.1, legpas: true,
               ordendiepte: 5, snelschud: true, tt: true, killers: true },
-    uitleg:'Ferdinand denkt zoals Stefaan, alleen minder ver vooruit. Hij speelt altijd de zet die hij het sterkste vindt: je moet hem echt te slim af zijn.',
+    uitleg:'Ferdinand denkt zoals Stefaan, alleen minder ver vooruit. Hij speelt altijd de zet die hij het sterkste vindt en geeft niets cadeau: je moet hem echt te slim af zijn.',
     // Kostuum, strikje, monocle, krulsnor en een spitse grijze baard.
     gezicht: aiGezicht('#5a3014',
       '<path d="M12 100C14 82 30 74 50 74S86 82 88 100Z" fill="#2b2b36"/>' +
@@ -4545,7 +4545,7 @@ const AI_TEGENSTANDERS = [
       '<path d="M64.5 51C70 58 66 68 72 80" fill="none" stroke="#d9b44a" stroke-width="1.1"/>') },
   { niveau:5, naam:'Stefaan', graad:'Meester', kleur:'#e9483b', gloed:'rgba(233,72,59,.38)', diepte:AI_SEARCH_DEPTH, foutkans:0, rlBot:false, temperatuur:0,
     eenbot: true, // = EENBOT_OPTIES
-    uitleg:'Stefaan speelt altijd de zet die hij het sterkste vindt. Hij leerde het spel door miljoenen partijen tegen zichzelf te spelen. Wie hem verslaat, mag trots zijn baard laten staan.',
+    uitleg:'Stefaan is de koning van de baarden. Hij leerde het spel door talloze partijen tegen zichzelf te spelen en speelt altijd de zet die hij het sterkste vindt. Wie hem verslaat, mag trots zijn baard laten staan.',
     // De koning van de baarden: kroon, borstelige wenkbrauwen en een witte baard tot op de grond.
     gezicht: aiGezicht('#561816',
       '<path d="M10 100C12 80 30 72 50 72S88 80 90 100Z" fill="#3b1420"/>' +
